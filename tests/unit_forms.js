@@ -66,7 +66,7 @@ eq('item 8 flight rules', d.rules, 'I'); eq('item 15 speed', d.speed, 'N0110'); 
 eq('item 13 departure', d.dep, 'KRYN'); eq('item 16 destination', d.dest, 'KTUS'); eq('item 16 altn', d.altn, 'KIWA');
 ok('item 16 EET is 4 digits', /^\d{4}$/.test(d.eet), d.eet);
 eq('originator = departure + YXYX', d.originator, 'KRYNYXYX');
-ok('item 18 carries PBN and DOF with the real date', /PBN\/C2S1/.test(d.other[0]) && /DOF\/261028/.test(d.other[0]), d.other[0]);
+ok('item 18 carries PBN and DOF with the real date', /PBN\/C2S1/.test(d.other[0]) && d.other[0].includes('DOF/' + m.date.slice(2).replace(/-/g, '')), d.other[0]);
 ok('last item-18 line = ETE to alternate', /^ETE TO ALTERNATE/.test(d.other[7]), d.other[7]);
 ok('no literal YYMMDD', !/YYMMDD/.test(JSON.stringify(d)));
 ok('item 10 defaults', JSON.stringify(m.f1801.nav) === '["S","G","R","U"]' && JSON.stringify(m.f1801.surv) === '["S","B1"]' && JSON.stringify(m.f1801.pbn) === '["C2","S1"]');
