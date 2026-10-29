@@ -1,6 +1,6 @@
 // node model_eval.js scenarios.json compat(0/1)  -> prints {scenario: {key: value}} computed by the app's model
 const fs = require('fs'), path = require('path');
-const M = require('../site/js/model.js');
+const M = require('../site/js/model.js'); require('./legacy_calls.js')(M);
 const sc = JSON.parse(fs.readFileSync(process.argv[2])); const compat = process.argv[3] === '1';
 const st = JSON.parse(fs.readFileSync(path.join(__dirname, '../site/data/2610/AZ.json'))), st2 = JSON.parse(fs.readFileSync(path.join(__dirname, '../site/data/static.json')));
 const airports = st.a; for (const k in airports) airports[k].id = k;

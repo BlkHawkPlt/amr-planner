@@ -27,5 +27,6 @@
    }
   }
  ],
- "filter": "training"
+ "filter": "training",
+ "schema": 2
 }

@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 BASE = (args[0] if args else 'http://localhost:8765/').rstrip('/') + '/'
 SHOTS = sys.argv[sys.argv.index('--shots') + 1] if '--shots' in sys.argv else None
+TAG = 'iphone'
 if SHOTS: os.makedirs(SHOTS, exist_ok=True)
 fails = []; n = [0]
 def check(label, ok, extra=''):
@@ -25,6 +26,50 @@ def pick(pg, path, ident):
     el = pg.locator(f'[data-b="{path}"]'); el.click(); el.fill(ident)
     pg.wait_for_selector(f'[data-b="{path}"] + ul.sug li', timeout=4000)
     pg.locator(f'[data-b="{path}"] + ul.sug li').first.dispatch_event('pointerdown'); pg.wait_for_timeout(150)
+
+def suite(pg, TAG):
+        # ---- flight-plan tabs: official PDFs filled in the browser, previewed with pdf.js
+        def pdf_text(fk):
+            return pg.evaluate("""async fk => { const A = __amr; const bytes = await A.buildPdf(fk, true);
+              const head = String.fromCharCode(...bytes.slice(0, 5)); const doc = await pdfjsLib.getDocument({data: bytes.slice()}).promise, pgx = await doc.getPage(1), tc = await pgx.getTextContent();
+              return {head, n: doc.numPages, text: tc.items.map(i => i.str).join(' ')}; }""", fk)
+        def dark_pixels():
+            return pg.evaluate("""() => { const c = document.querySelector('#pdfc'); if (!c) return -1; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 90 && d[i+1] < 90 && d[i+2] < 90) n++; return n; }""")
+        def no_hscroll(label):
+            w = pg.evaluate('[document.documentElement.scrollWidth, window.innerWidth]'); check(label + ' no horizontal page overflow', w[0] <= w[1] + 1, str(w))
+        pg.click('#tabs [data-tab="fp"]'); pg.wait_for_selector('#pdfhost[data-ready="1801"]', timeout=20000)
+        check('DD 1801 is the primary flight-plan tab (default sub-tab)', pg.evaluate('__amr.S.fp') == '1801' and 'DD 1801' in pg.inner_text('#tabs [data-tab="fp"]'))
+        t = pdf_text('1801'); check('DD 1801 PDF built (1 page, %PDF)', t['head'].startswith('%PDF') and t['n'] == 1, str(t['head']))
+        check('DD 1801 PDF carries origin, destination, route', all(x in t['text'].replace(' ', '') for x in ('KTUS', 'KRYN', 'DCT')), t['text'][:300])
+        check('DD 1801 preview canvas is drawn', dark_pixels() > 5000, str(dark_pixels()))
+        no_hscroll('DD 1801 tab')
+        if SHOTS: pg.screenshot(path=f'{SHOTS}/{TAG}_dd1801.png', full_page=False)
+        pg.click('[data-fp="1801c"]'); pg.wait_for_function("document.querySelector('#pdfhost').dataset.ready === '1801c'", timeout=20000)
+        check('DD 1801-C renders', dark_pixels() > 5000)
+        if SHOTS: pg.screenshot(path=f'{SHOTS}/{TAG}_dd1801c.png', full_page=False)
+        pg.click('[data-fp="175"]'); pg.wait_for_function("document.querySelector('#pdfhost').dataset.ready === '175'", timeout=20000)
+        check('DD 175 (legacy) is a secondary sub-tab and renders', dark_pixels() > 5000 and 'legacy' in pg.inner_text('.subnav').lower())
+        if SHOTS: pg.screenshot(path=f'{SHOTS}/{TAG}_dd175.png', full_page=False)
+        pg.click('[data-fp="1801"]'); pg.wait_for_function("document.querySelector('#pdfhost').dataset.ready === '1801'", timeout=20000)
+        pg.click('#tabs [data-tab="1751"]'); pg.wait_for_function("document.querySelector('#pdfhost') && document.querySelector('#pdfhost').dataset.ready === '1751'", timeout=20000)
+        t = pdf_text('1751'); check('DD 175-1 PDF built and contains the departure + destinations', t['n'] == 1 and all(x in t['text'].replace(' ', '') for x in ('KTUS', 'KRYN')), t['text'][:200])
+        check('DD 175-1 preview canvas is drawn', dark_pixels() > 5000)
+        no_hscroll('DD 175-1 tab')
+        if SHOTS: pg.screenshot(path=f'{SHOTS}/{TAG}_dd1751.png', full_page=False)
+        # live update: change the departure time on the plan, the 1801 text must follow
+        pg.evaluate("__amr.S.m.f175.etd = '2115'"); t = pdf_text('1801'); check('DD 1801 follows the plan (ETD 2115 in item 13)', '2115' in t['text'].replace(' ', ''), t['text'][:200])
+        pg.evaluate("__amr.S.m.f175.etd = '1930'")
+        # ---- scripts: weather source toggle + facility fill
+        pg.click('#tabs [data-tab="scripts"]'); pg.wait_for_timeout(400)
+        st = pg.inner_text('#view-scripts'); check('scripts name the facilities from FAA data', 'Tucson' in st and 'Approach' in st, st[:200])
+        check('scripts show filled values highlighted', pg.locator('#view-scripts .fv').count() > 40, str(pg.locator('#view-scripts .fv').count()))
+        pg.select_option('#view-scripts [data-b="d1.wx"]', 'AWOS'); pg.wait_for_timeout(300)
+        st = pg.inner_text('#view-scripts'); check('AWOS toggle: "one-minute weather" wording, no info letter for destination 1', 'one-minute weather' in st and 'AWOS' in st)
+        check('script settings updated the plan', pg.evaluate('__amr.S.m.d1.wx') == 'AWOS')
+        pg.select_option('#view-scripts [data-b="d1.wx"]', 'AUTO'); no_hscroll('Scripts tab')
+        if SHOTS: pg.screenshot(path=f'{SHOTS}/{TAG}_scripts.png', full_page=False)
+        pg.click('#tabs [data-tab="plan"]'); pg.wait_for_timeout(300)
+        check('plan has a weather-source hint', len(pg.inner_text('#wxh-d1')) > 3, pg.inner_text('#wxh-d1'))
 
 with sync_playwright() as p:
     try: b = p.chromium.launch(args=['--no-sandbox'])
@@ -61,13 +106,19 @@ with sync_playwright() as p:
     pg.click('#tabs [data-tab="amr"]'); pg.wait_for_timeout(300)
     t = pg.inner_text('#view-amr'); check('AMR shows the three airports', all(x in t for x in ('(TUS)', '(RYN)', '(DMA)')))
     if SHOTS: pg.screenshot(path=f'{SHOTS}/live_iphone_amr.png', full_page=True)
-    pg.click('#tabs [data-tab="175"]'); pg.wait_for_timeout(300)
-    t = pg.inner_text('#view-175'); check('DD 175 shows route', 'KTUS' in t and 'KDMA' in t and 'KRYN' in t, t[:200])
-    if SHOTS: pg.screenshot(path=f'{SHOTS}/live_iphone_dd175.png', full_page=True)
+    suite(pg, 'iphone')
     ctx.set_offline(True); pg.reload(); pg.wait_for_selector('body[data-ready="1"]', timeout=20000)
     check('offline reload works (served by service worker)', pg.evaluate('!!__amr.D.ap("KTUS")') and ('cycle ' + str(exp)) in pg.inner_text('#cycBadge'))
     ctx.set_offline(False)
     check('no console/page errors', not errs, str(errs[:3]))
+    # ---- iPad (portrait) pass over the same tabs
+    c2 = b.new_context(viewport={'width': 820, 'height': 1180}, device_scale_factor=2, has_touch=True, is_mobile=True)
+    p2 = c2.new_page(); e2 = []
+    p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('console', lambda m: e2.append(m.text) if m.type == 'error' else None)
+    p2.goto(BASE); p2.wait_for_selector('body[data-ready="1"]', timeout=20000)
+    p2.evaluate("""async () => { const m = __amr.S.m; m.dep.id = 'KTUS'; m.d1.id = 'KRYN'; m.d2.id = 'KDMA'; await __amr.D.loadState('AZ'); __amr.setTab('plan'); }""")
+    suite(p2, 'ipad')
+    check('iPad: no console/page errors', not e2, str(e2[:3]))
     b.close()
 print(f'{n[0]} checks, {len(fails)} failures'); [print('  FAIL', f) for f in fails]
 sys.exit(1 if fails else 0)

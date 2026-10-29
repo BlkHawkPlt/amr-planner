@@ -87,8 +87,10 @@ def run(name, vp):
             m = re.search(re.escape(lab) + r'\s*(.*)', txt); check(f'[{name}] AMR {lab} = AMR!{ref}', m.group(1) if m else None, w('AMR', ref))
         check(f'[{name}] AMR aircraft/design', re.search(r'Aircraft:\s*(.*)', txt).group(1).replace('\xa0', ' ').replace('  ', ' '), 'UH-72 ' + w('AMR', 'C13'))
         pg.screenshot(path=f'{SHOTS}/{name}_amr.png', full_page=True)
-        pg.click('#tabs [data-tab="175"]'); pg.wait_for_timeout(200)
-        vs = pg.eval_on_selector_all('#view-175 .v', 'els=>els.map(e=>e.textContent.trim())')
+        def pdf_items(fk):    # text of the filled official PDF (pdf.js text items)
+            return pg.evaluate("""async fk => { const bytes = await __amr.buildPdf(fk, true); const doc = await pdfjsLib.getDocument({data: bytes.slice()}).promise, p = await doc.getPage(1), tc = await p.getTextContent(); return tc.items.map(i => i.str.trim()).filter(Boolean); }""", fk)
+        pg.click('#tabs [data-tab="fp"]'); pg.wait_for_timeout(200)
+        vs = pdf_items('175')
         exp175 = {'callsign': w('DD 175', 'P2'), 'design': w('DD 175', 'R2')}
         for lab, val in (('callsign', w('DD 175', 'P2')), ('design', w('DD 175', 'R2')), ('TAS leg1', w('DD 175', 'C5')), ('TAS leg2', w('DD 175', 'C6')), ('route/to leg 1', w('DD 175', 'K12')), ('alternate', w('DD 175', 'B18')), ('weather void/init', w('DD 175', 'J18')), ('serial/unit', w('DD 175', 'N18'))):
             check(f'[{name}] DD175 {lab}', ws(val) in [ws(v) for v in vs], True)
@@ -97,24 +99,28 @@ def run(name, vp):
         def hm(ref):
             v = WB['DD 175'][ref].value; t = v.total_seconds() if isinstance(v, datetime.timedelta) else v.hour * 3600 + v.minute * 60; return f'{int(t//3600):02d}+{int((t%3600)//60):02d}'
         for lab, val in (('ETD leg1', hhmm('G12')), ('ETD leg2', hhmm('G14')), ('ETE leg1', hm('S12')), ('ETE leg2', hm('S14')), ('ETE to alt', hm('E18')), ('mid L13', w('DD 175', 'L13'))):
-            check(f'[{name}] DD175 {lab}', val in vs, True)
+            check(f'[{name}] DD175 {lab}', val in vs or ws(val) in ws(' '.join(vs)), True)
         for lab, ref in (('fuel leg1', 'Q16'), ('fuel leg2', 'R16'), ('fuel leg1+alt', 'S16')):
-            val = int(float(WB['DD 175'][ref].value) + 0.5); check(f'[{name}] DD175 {lab}', any(v.startswith(str(val) + ' ') for v in vs), True)
+            val = int(float(WB['DD 175'][ref].value) + 0.5); check(f'[{name}] DD175 {lab}', any((str(val) + ' ') in v for v in vs), True)
+        pg.click('[data-fp="175"]'); pg.wait_for_function("document.querySelector('#pdfhost').dataset.ready === '175'", timeout=20000)
         pg.screenshot(path=f'{SHOTS}/{name}_dd175.png', full_page=True)
         pg.click('#tabs [data-tab="1751"]'); pg.wait_for_timeout(200)
-        t1751 = pg.inner_text('#view-1751')
+        t1751 = ' '.join(pdf_items('1751'))
         for lab, ref in (('PA', 'AM4'), ('remarks', 'A9'), ('sfc wind', 'A6')):
-            check(f'[{name}] 175-1 {lab}', ws(w('175-1', ref)) in ws(t1751), True)
-        check(f'[{name}] 175-1 void time', w('175-1', 'A60') + 'Z' in t1751, True)
+            check(f'[{name}] 175-1 {lab}', ws(w('175-1', ref)).replace(' ', '') in ws(t1751).replace(' ', ''), True)
+        check(f'[{name}] 175-1 void time', w('175-1', 'A60') in t1751, True)
         pg.screenshot(path=f'{SHOTS}/{name}_dd175-1.png', full_page=True)
         pg.click('#tabs [data-tab="scripts"]'); pg.wait_for_timeout(200)
         sc = dict(pg.eval_on_selector_all('#view-scripts .script', 'els=>els.map(e=>{const h=e.querySelector("h3");const p=e.querySelector("p");return h&&p?[h.childNodes[0].textContent.trim(),p.textContent.trim()]:null}).filter(Boolean)'))
         def find(prefix): return next(v for k, v in sc.items() if k.startswith(prefix))
-        for lab, pref, ref in (('departure WX (AWOS...)', 'Departure weather', 'A2'), ('clearance delivery', 'Clearance delivery', 'A6'), ('taxi', 'Taxi', 'A10'), ('takeoff', 'Takeoff', 'A13'), ('departure control', 'Departure control', 'A18'),
-                               ('dest1 WX', 'Destination 1 weather', 'A23'), ('dest1 approach info', 'Approach information', 'A27'), ('dest1 approach clearance', 'Approach clearance (RNAV within TAA)', 'A30'), ('dest1 tower', 'Tower (or)', 'A37'),
-                               ('missed', 'Missed approach - handoff', 'M2'), ('to dest2', 'Clearance to 2nd destination', 'M8'), ('dest2 WX', 'Destination 2 weather', 'M15'), ('dest2 info', 'Destination 2 approach information', 'M19'), ('dest2 clearance', 'Destination 2 approach clearance', 'M22'),
-                               ('dest2 tower', 'Destination 2 tower', 'M31')):
-            check(f'[{name}] script {lab} = Grade Sheet!{ref}', find(pref), w('Grade Sheet', ref))
+        # the scripts were reworded (AWOS/ASOS aware, every fillable blank filled), so compare the FACTS with the workbook's Grade Sheet instead of the sentence
+        def facts(txt): return set(re.findall(r'\b(?:\d{3}\.\d{1,2}|\d{2,5})\b', txt))
+        for lab, pref, ref in (('departure WX', 'Departure weather', 'A2'), ('dest1 WX', 'Destination 1 weather', 'A23'), ('dest2 WX', 'Destination 2 weather', 'M15')):
+            wx_nums = {t for t in facts(w('Grade Sheet', ref)) if len(t) == 3 or '.' in t}      # wind dir, ceiling, altimeter
+            check(f'[{name}] script {lab} carries the workbook weather numbers', wx_nums <= (facts(find(pref)) | {t.lstrip('0') for t in facts(find(pref))}), True)
+        check(f'[{name}] scripts use the call sign', all(re.search(r'\b\d{5}\b', find(p)) for p in ('Clearance delivery', 'Taxi', 'Takeoff', 'Departure control', 'Clearance to 2nd destination')), True)
+        check(f'[{name}] destination clearances name the approaches', S['d1']['apr'] in find('Approach clearance') and S['d2']['apr'] in find('Destination 2 approach clearance'), True)
+        check(f'[{name}] script blanks only where ATC assigns', not re.search(r'void|NLT', pg.inner_text('#view-scripts .bk') if pg.locator('#view-scripts .bk').count() else ''), True)
         pg.screenshot(path=f'{SHOTS}/{name}_scripts.png', full_page=True)
         pg.click('#tabs [data-tab="info"]'); pg.wait_for_timeout(200); pg.screenshot(path=f'{SHOTS}/{name}_info.png', full_page=True)
         # cycle + disclaimer visible
@@ -138,7 +144,7 @@ def run(name, vp):
         check(f'[{name}] offline airport search', pg.evaluate('__amr.D.search("RYN",3)[0].id'), 'KRYN')
         ctx.set_offline(False)
         if name == 'ipad':
-            for t, fn in (('amr', 'AMR'), ('175', 'DD175'), ('1751', 'DD175-1'), ('scripts', 'Scripts')):
+            for t, fn in (('amr', 'AMR'), ('scripts', 'Scripts')):
                 pg.click(f'#tabs [data-tab="{t}"]'); pg.wait_for_timeout(200); pg.pdf(path=f'{SHOTS}/print_{fn}.pdf', format='Letter', print_background=True)
         check(f'[{name}] no JS errors', errs, [])
         b.close()

@@ -6,7 +6,7 @@ Usage:
   python3 build_data.py --raw raw/2026-10-29 --tpp-cycle 2611 --states ALL --out out-all/2611
 
 Inputs (flat dir made by fetch_data.py):
-  APT_BASE.csv APT_RWY_END.csv FRQ.csv DP_BASE.csv DP_RTE.csv dtpp.xml
+  APT_BASE.csv APT_RWY_END.csv FRQ.csv DP_BASE.csv DP_RTE.csv dtpp.xml  (+ optional AWOS.csv for the weather-station type/phone)
 
 Conventions copied from the AMR workbook (qry_* sheets):
   * airport id   = ICAO_ID if present else FAA LID (ARPT_ID)         e.g. KTUS, P08, 02AZ
@@ -61,6 +61,7 @@ def main():
     ap.add_argument('--states', default='AZ', help='comma list of 2-letter codes, or ALL')
     ap.add_argument('--filter', default='training', choices=['training', 'all'])
     ap.add_argument('--out', required=True)
+    ap.add_argument('--cifp', help='path to FAACIFP18 (FAA CIFP, ARINC 424): adds IAF/IF/FAF/crossing altitudes and missed approach text (pr) per approach')
     a = ap.parse_args()
     raw = a.raw
     os.makedirs(os.path.join(a.out, 'states'), exist_ok=True)
@@ -166,6 +167,76 @@ def main():
                 z = r['ARTCC_OR_FSS_ID']
                 addf(i, 'CNTR', ARTCC.get(z, m.group(1).strip()) + ' CNTR', r['FREQ'])
 
+
+    # ---- richer facility data for the Scripts page (does not touch the workbook-compatible 'f' list) ----
+    #  g.tc  tower call sign      g.hr tower hours      g.T tower  g.G ground  g.C clearance delivery  g.I ATIS/D-ATIS
+    #  g.U UNICOM   g.F CTAF      g.A approach/departure (VHF then UHF)      g.ac approach radio call
+    #  w = {t: 'ASOS'|'AWOS-3PT'.., p: phone, f: radio frequency (when NASR lists one)}
+    def fnum(f):
+        try: return float(f)
+        except Exception: return None
+    def fmt(f): return ('%.3f' % float(f)).rstrip('0').rstrip('.') if '.' in ('%.3f' % float(f)) else f
+    def fmt2(f):
+        x = '%.3f' % float(f)
+        return x[:-1] if x.endswith('0') else x          # 118.3 -> 118.30 style trimmed to >=2 decimals
+    CAT = [('LCL/P', 'T'), ('LCL/S', 'T'), ('LCL', 'T'), ('GND/P', 'G'), ('GND/S', 'G'), ('CD/P', 'C'), ('CD/S', 'C'), ('D-ATIS', 'I'), ('ATIS', 'I'),
+           ('UNICOM', 'U'), ('CTAF', 'F')]
+    G = collections.defaultdict(lambda: collections.defaultdict(list))
+    ENT = {'ATCT', 'ATCT-TRACON', 'ATCT-A/C', 'ATCT-RAPCON', 'ATCT-RATCF', 'NON-ATCT'}
+    for r in rd(f'{raw}/FRQ.csv'):
+        i = ID.get((r['SERVICED_FACILITY'], r['SERVICED_STATE']))
+        if not i: continue
+        fu, ft = r['FREQ_USE'].strip(), r['FACILITY_TYPE']
+        fv = fnum(r['FREQ'])
+        if fv is None or not (108.0 <= fv <= 400.0): continue
+        key = None
+        if ft in ENT:
+            for pre, k in CAT:
+                if fu == pre or (pre in ('LCL/P', 'LCL/S', 'GND/P', 'GND/S', 'CD/P', 'CD/S') and fu == pre): key = k; break
+            if fu in ('LCL/P', 'LCL/S', 'GND/P', 'GND/S', 'CD/P', 'CD/S', 'ATIS', 'D-ATIS', 'UNICOM', 'CTAF', 'LCL'):
+                pass
+            if key and ft != 'NON-ATCT' and r['TOWER_OR_COMM_CALL'] and 'tc' not in G[i]:
+                G[i]['tc'] = r['TOWER_OR_COMM_CALL'].strip().upper(); G[i]['hr'] = r['TOWER_HRS'].strip()
+        elif ft in TERM or ft in ('TRACON', 'CERAP'):
+            if fu.startswith('APCH/P') or fu.startswith('DEP/P'):
+                key = 'A'
+                call = (r['PRIMARY_APPROACH_RADIO_CALL'] or r['TOWER_OR_COMM_CALL']).strip().upper()
+                if call and 'ac' not in G[i]: G[i]['ac'] = call
+        elif ft == 'ASOS_AWOS':
+            G[i]['_wf'] = r['FREQ']
+            continue
+        if key:
+            f2 = fmt2(r['FREQ'])
+            if f2 not in G[i][key]: G[i][key].append(f2)
+    WX = {}
+    awp = f'{raw}/AWOS.csv'
+    if os.path.exists(awp):
+        for r in rd(awp):
+            i = ID.get((r['ASOS_AWOS_ID'], r['STATE_CODE']))
+            if not i or i in WX: continue
+            w = {'t': r['ASOS_AWOS_TYPE'].strip()}
+            if r['PHONE_NO'].strip(): w['p'] = r['PHONE_NO'].strip()
+            if r['SECOND_PHONE_NO'].strip(): w['p2'] = r['SECOND_PHONE_NO'].strip()
+            WX[i] = w
+    for i, d in G.items():
+        wf = d.pop('_wf', None)
+        if wf and i in WX: WX[i]['f'] = fmt2(wf)
+        elif wf and i not in WX: WX[i] = {'t': 'AWOS', 'f': fmt2(wf)}
+        gg = {}
+        for k in ('T', 'G', 'C', 'I', 'U', 'F', 'A'):
+            v = sorted(d.get(k, []), key=lambda x: (float(x) >= 225.0))      # VHF first, UHF after (stable)
+            if v: gg[k] = v
+        for k in ('tc', 'hr', 'ac'):
+            if d.get(k): gg[k] = d[k]
+        if gg: A[i]['g'] = gg
+    for i, w in WX.items():
+        if i in A:
+            if w.get('f') is None and i in G and False: pass
+            A[i]['w'] = w
+
+    if a.cifp and os.path.exists(a.cifp):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cifp as C
+        na, nm, nt = C.attach(A, C.parse(a.cifp)); print(f'CIFP: procedure details for {nm} of {nt} approaches at {na} airports')
     # write per-state files
     cyc_info = dict(tpp=cyc, nasr=nasr_date, from_=tfrom, to=tto)
     cyc_info = {'tpp': cyc, 'nasr': nasr_date, 'from': tfrom, 'to': tto}

@@ -1,0 +1,30 @@
+{
+ "dd1801": {
+  "vector_items": 107,
+  "max_offset_pt": 0.0,
+  "words_added": 96,
+  "words_outside_fields": 0,
+  "min_font_pt": 8.0
+ },
+ "dd1801c": {
+  "vector_items": 72,
+  "max_offset_pt": 0.0,
+  "words_added": 84,
+  "words_outside_fields": 0,
+  "min_font_pt": 8.0
+ },
+ "dd175": {
+  "vector_items": 249,
+  "max_offset_pt": 0.0,
+  "words_added": 102,
+  "words_outside_fields": 0,
+  "min_font_pt": 8.0
+ },
+ "dd175-1": {
+  "vector_items": 503,
+  "max_offset_pt": 0.0,
+  "words_added": 87,
+  "words_outside_fields": 0,
+  "min_font_pt": 4.5
+ }
+}

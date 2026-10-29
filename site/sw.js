@@ -1,6 +1,7 @@
 /* Offline cache. Cache-first for app shell + data. The deploy workflow rewrites CACHE with the commit id on every deploy, so each release gets a fresh cache. States with "pre": false in data/manifest.json are cached only when first opened. */
 const CACHE = 'amr-planner-v1.0.0';
-const SHELL = ['./', 'index.html', 'css/app.css', 'js/model.js', 'js/data.js', 'js/app.js', 'manifest.webmanifest',
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/model.js', 'js/scripts.js', 'js/dd1801.js', 'js/forms.js', 'js/data.js', 'js/app.js',
+  'vendor/pdf-lib.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'forms/fields.json', 'forms/dd1801.pdf', 'forms/dd1801c.pdf', 'forms/dd175.pdf', 'forms/dd175-1.pdf', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.png', 'data/manifest.json', 'data/static.json'];
 self.addEventListener('install', e => {
   e.waitUntil((async () => {

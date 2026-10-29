@@ -19,5 +19,19 @@ dev = []
 for r in range(2, 35):
     if ws[f'AA{r}'].value is None: continue
     dev.append(dict(device=v(f'AA{r}'), type=v(f'AB{r}'), n=str(v(f'AC{r}')), pad=v(f'AD{r}')))
-json.dump(dict(acft=acft, devices=dev), open(out, 'w'), indent=1)
-print(len(acft), 'aircraft,', len(dev), 'devices')
+# DD 1801 code lists + the workbook's default selections ('DD 1801' BB:BD, "XX" marks in BC)
+w2 = openpyxl.load_workbook(src, keep_vba=True)['DD 1801']
+def codes(a, b):
+    out = []
+    for r in range(a, b + 1):
+        c, d = w2.cell(r, 54).value, w2.cell(r, 56).value
+        if c and d:
+            c = str(c).strip(); d = str(d).strip()
+            out.append([c, d.split('=', 1)[1].strip() if d.startswith(c + '=') else d])
+    return out
+eq = dict(nav=codes(5, 41), sur=codes(44, 61), pbn=codes(87, 111),
+          navDefault=[str(w2.cell(r, 54).value).strip() for r in range(5, 42) if w2.cell(r, 55).value == 'XX'],
+          surDefault=[str(w2.cell(r, 54).value).strip() for r in range(44, 62) if w2.cell(r, 55).value == 'XX'],
+          pbnDefault=[str(w2.cell(r, 54).value).strip() for r in range(87, 112) if w2.cell(r, 55).value == 'XX'])
+json.dump(dict(acft=acft, devices=dev, eq=eq), open(out, 'w'), indent=1)
+print(len(acft), 'aircraft,', len(dev), 'devices,', len(eq['nav']), 'nav codes')

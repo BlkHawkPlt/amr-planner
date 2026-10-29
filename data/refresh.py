@@ -39,7 +39,9 @@ def posted(url):
 
 def urls(c):
     d = dt.date.fromisoformat(c['nasr']); tag = f"{d.day:02d}_{d.strftime('%b')}_{d.year}"
-    return [f'https://nfdc.faa.gov/webContent/28DaySub/extra/{tag}_{k}_CSV.zip' for k in ('APT', 'FRQ', 'DP')] + [f"https://aeronav.faa.gov/d-tpp/{c['tpp']}/xml_data/d-TPP_Metafile.xml"]
+    return [f'https://nfdc.faa.gov/webContent/28DaySub/extra/{tag}_{k}_CSV.zip' for k in ('APT', 'FRQ', 'DP', 'AWOS')] + [f"https://aeronav.faa.gov/d-tpp/{c['tpp']}/xml_data/d-TPP_Metafile.xml"]
+
+SCHEMA = 3        # bump when build_data.py output changes shape; forces already-shipped cycles to be rebuilt
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--states'); ap.add_argument('--now'); ap.add_argument('--dry-run', action='store_true')
@@ -51,12 +53,13 @@ def main():
     mpath = os.path.join(SITE, 'manifest.json')
     old = json.load(open(mpath)) if os.path.exists(mpath) else dict(cycles=[], filter=cfg['filter'])
     have = {c['tpp']: c for c in old['cycles']}
+    stale = old.get('schema', 1) != SCHEMA
     want = cycles_around(now); print('now', now.isoformat(), '-> current/next cycles', [c['tpp'] for c in want])
     built = {}
     for c in want:
         have_it = c['tpp'] in have
         want_states = None if allst else states
-        if have_it and not a.force:
+        if have_it and not a.force and not stale:
             same = allst and len(have[c['tpp']]['states']) > 20 or (not allst and set(states) <= set(have[c['tpp']]['states']))
             if same: print(c['tpp'], 'already shipped'); continue
         ok = all(posted(u) for u in urls(c))
@@ -66,7 +69,7 @@ def main():
         raw = os.path.join(HERE, 'raw', c['nasr']); out = os.path.join(HERE, 'out', c['tpp'])
         subprocess.check_call([sys.executable, os.path.join(HERE, 'fetch_data.py'), '--nasr', c['nasr'], '--tpp', c['tpp']])
         shutil.rmtree(out, ignore_errors=True)
-        subprocess.check_call([sys.executable, os.path.join(HERE, 'build_data.py'), '--raw', raw, '--tpp-cycle', c['tpp'], '--states', 'ALL' if allst else ','.join(states), '--filter', cfg['filter'], '--out', out])
+        subprocess.check_call([sys.executable, os.path.join(HERE, 'build_data.py'), '--raw', raw, '--tpp-cycle', c['tpp'], '--states', 'ALL' if allst else ','.join(states), '--filter', cfg['filter'], '--out', out] + (['--cifp', os.path.join(raw, 'FAACIFP18')] if os.path.exists(os.path.join(raw, 'FAACIFP18')) else []))
         built[c['tpp']] = (c, out)
     if a.dry_run or (not built):
         changed = bool(built)
@@ -90,8 +93,8 @@ def main():
             keep[t] = entry
         for d in glob.glob(os.path.join(SITE, '[0-9][0-9][0-9][0-9]')):
             if os.path.basename(d) not in keep: shutil.rmtree(d); print('removed', d)
-        new = dict(cycles=sorted(keep.values(), key=lambda c: c['from']), filter=cfg['filter'])
-        if changed: json.dump(new, open(mpath, 'w'), indent=1); open(mpath, 'a').write('\n')
+        new = dict(cycles=sorted(keep.values(), key=lambda c: c['from']), filter=cfg['filter'], schema=SCHEMA)
+        if changed or stale: changed = True; json.dump(new, open(mpath, 'w'), indent=1); open(mpath, 'a').write('\n')
     print('changed =', changed, '| manifest cycles:', [c for c in sorted(keep)] )
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as f: f.write(f'changed={"true" if changed else "false"}\ncycles={",".join(sorted(keep))}\n')

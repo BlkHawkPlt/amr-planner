@@ -49,7 +49,7 @@ jobs:
       - name: Install Playwright + Chromium
         if: steps.refresh.outputs.changed == 'true'
         run: |
-          pip install playwright
+          pip install playwright pymupdf
           playwright install --with-deps chromium
       - name: Tests on the rebuilt data
         if: steps.refresh.outputs.changed == 'true'

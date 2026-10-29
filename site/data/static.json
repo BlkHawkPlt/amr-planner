@@ -272,5 +272,343 @@
    "n": "12345",
    "pad": "BLANK"
   }
- ]
+ ],
+ "eq": {
+  "nav": [
+   [
+    "S",
+    "Standard COM/NAV/Approach Aid equipment for the route to be flown is carried and serviceable. AND Means that VHF RTF, VOR, and ILS receiver is FM immune compliant."
+   ],
+   [
+    "N",
+    "No COM/NAV/Approach Aid equipment for the route to be flown is carried or the equipment is unserviceable."
+   ],
+   [
+    "A",
+    "GBAS landing system"
+   ],
+   [
+    "B",
+    "LPV (APV with SBAS"
+   ],
+   [
+    "C",
+    "LORAN C"
+   ],
+   [
+    "D",
+    "DME"
+   ],
+   [
+    "E1",
+    "FMC WPR ACARS"
+   ],
+   [
+    "E2",
+    "D-FIS ACARS"
+   ],
+   [
+    "E3",
+    "PDC ACARS"
+   ],
+   [
+    "F",
+    "ADF"
+   ],
+   [
+    "G",
+    "(GNSS) Enter in Item 18 the types of external GNSS augmentation (NAV/ and seperated by a space)"
+   ],
+   [
+    "H",
+    "HF RTF"
+   ],
+   [
+    "I",
+    "Inertial Navigation"
+   ],
+   [
+    "J1",
+    "CPDLC ATN VDL Mode 2 (See Note 4 in the General Planner)"
+   ],
+   [
+    "J2",
+    "CPDLC FANS 1/A HFDL"
+   ],
+   [
+    "J3",
+    "CPDLC FANS 1/A VDL Mode 4"
+   ],
+   [
+    "J4",
+    "CPDLC FANS 1/A VDL Mode 2"
+   ],
+   [
+    "J5",
+    "CPDLC FANS 1/A SATCOM (INMARSAT)"
+   ],
+   [
+    "J6",
+    "CPDLC FANS 1/A SATCOM (MTSAT)"
+   ],
+   [
+    "J7",
+    "CPDLC FANS 1/A SATCOM (Iridium)"
+   ],
+   [
+    "L",
+    "ILS"
+   ],
+   [
+    "M1",
+    "ATC RTF SATCOM (INMARSAT)"
+   ],
+   [
+    "M2",
+    "ATC RTF (MTSAT)"
+   ],
+   [
+    "M3",
+    "ATC RTF (Iridium)"
+   ],
+   [
+    "O",
+    "VOR"
+   ],
+   [
+    "P1",
+    "CPDLC RCP 400 (See Note 8 in the General Planner)"
+   ],
+   [
+    "P2",
+    "CPDLC RCP 240 (See Note 8 in the General Planner)"
+   ],
+   [
+    "P3",
+    "SATVOICE RCP 400 (See Note 8 in the General Planner)"
+   ],
+   [
+    "P4-P9",
+    "P4 thru P9=Reserved for RCP"
+   ],
+   [
+    "R",
+    "PBN Approved (Enter PBN/ in Item 18 and the performance based navigation levels that can be met)."
+   ],
+   [
+    "T",
+    "TACAN"
+   ],
+   [
+    "U",
+    "UHF RTF"
+   ],
+   [
+    "V",
+    "VHF RTF"
+   ],
+   [
+    "W",
+    "RVSM Approved"
+   ],
+   [
+    "X",
+    "MNPS Approved"
+   ],
+   [
+    "Y",
+    "VHF with 8.33 kHz channel spacing"
+   ],
+   [
+    "Z",
+    "Other equipment carried or other capabilities. Specify in Item 18 other equipment carried or other capabilities, preceded by COM/, NAV/, and/or DAT/. If aircraft is not FM immune, include: NAV/NON-FM IMMUNE VOR/ILS."
+   ]
+  ],
+  "sur": [
+   [
+    "N",
+    "No Surveillance equipment for the route to be flown or they are unserviceable."
+   ],
+   [
+    "A",
+    "Transponder Mode A (4 digits - 4096 Codes)"
+   ],
+   [
+    "C",
+    "Transponder Mode C (4 digits - 4096 Codes) and Mode C"
+   ],
+   [
+    "E",
+    "Transponder Mode S incl acft id, pressure alt. & extended squitter (ADS-B) cap."
+   ],
+   [
+    "H",
+    "Transponder Mode S incl acft id, pressure altitude & enhanced surveillance capability."
+   ],
+   [
+    "I",
+    "Transponder Mode S including aircraft identification transmission, but no pressure altitude transmission."
+   ],
+   [
+    "L",
+    "Transponder Mode S including aircraft identification, pressure altitude, extended squitter (ADS-B) and enhanced surveillance capability."
+   ],
+   [
+    "P",
+    "Transponder Mode S  pressure altitude but no aircraft identification."
+   ],
+   [
+    "S",
+    "Transponder Mode S including  both pressure-altitude and aircraft identification capability."
+   ],
+   [
+    "X",
+    "Transponder Mode S with neither  aircraft identification nor pressure-altitude capability."
+   ],
+   [
+    "B1",
+    "ADS-B with dedicated 1090 MHz ADS-B \"out\" capability"
+   ],
+   [
+    "B2",
+    "ADS-B with dedicated 1090 MHz ADS-B \"out\" and \"in\" capability"
+   ],
+   [
+    "U1",
+    "ADS-B \"out\" capability using UAT"
+   ],
+   [
+    "U2",
+    "ADS-B \"out\" and \"in\" capability using UAT"
+   ],
+   [
+    "V1",
+    "ADS-B \"out\" capability using VDL Mode 4"
+   ],
+   [
+    "V2",
+    "ADS-B \"out\" and \"in\" capability using VDL Mode 4"
+   ],
+   [
+    "D1",
+    "ADS-C with FANS 1/A capabilities"
+   ],
+   [
+    "G1",
+    "ADS-C with ATN capabilities"
+   ]
+  ],
+  "pbn": [
+   [
+    "A1",
+    "RNAV 10 (RNP 10)"
+   ],
+   [
+    "B1",
+    "RNAV 5 all permitted sensors."
+   ],
+   [
+    "B2",
+    "RNAV 5 GNSS"
+   ],
+   [
+    "B3",
+    "RNAV 5 DME/DME"
+   ],
+   [
+    "B4",
+    "RNAV 5 VOR/DME"
+   ],
+   [
+    "B5",
+    "RNAV 5 INS or IRS"
+   ],
+   [
+    "B6",
+    "RNAV 5 LORANC"
+   ],
+   [
+    "C1",
+    "RNAV 2 all permitted sensors."
+   ],
+   [
+    "C2",
+    "RNAV 2 GNSS"
+   ],
+   [
+    "C3",
+    "RNAV 2 DME/DME"
+   ],
+   [
+    "C4",
+    "RNAV 2 DME/DME/IRU"
+   ],
+   [
+    "D1",
+    "RNAV 1 all permitted sensors."
+   ],
+   [
+    "D2",
+    "RNAV 1 GNSS"
+   ],
+   [
+    "D3",
+    "RNAV 1 DME/DME"
+   ],
+   [
+    "D4",
+    "RNAV 1 DME/DME/IRU"
+   ],
+   [
+    "L1",
+    "RNP 4"
+   ],
+   [
+    "O1",
+    "Basic RNP 1 all permitted sensors."
+   ],
+   [
+    "O2",
+    "Basic RNP 1 GNSS"
+   ],
+   [
+    "O3",
+    "Basic RNP 1 DME/DME"
+   ],
+   [
+    "O4",
+    "Basic RNP 1 DME/DME/IRU"
+   ],
+   [
+    "S1",
+    "RNP APCH"
+   ],
+   [
+    "S2",
+    "RNP APCH with BARO-VNAV"
+   ],
+   [
+    "T1",
+    "RNP AR APCH with RF (special authorization required)"
+   ],
+   [
+    "T2",
+    "RNP AR APCH without RF (special authorization required)"
+   ]
+  ],
+  "navDefault": [
+   "S",
+   "G",
+   "R",
+   "U"
+  ],
+  "surDefault": [
+   "S",
+   "B1"
+  ],
+  "pbnDefault": [
+   "C2",
+   "S1"
+  ]
+ }
 }

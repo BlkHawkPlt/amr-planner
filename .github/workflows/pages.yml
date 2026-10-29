@@ -27,7 +27,7 @@ jobs:
         with: { python-version: '3.12' }
       - name: Install Playwright + Chromium
         run: |
-          pip install playwright
+          pip install playwright pymupdf
           playwright install --with-deps chromium
       - name: Tests (unit, data sanity, headless UI smoke)
         run: tests/ci.sh

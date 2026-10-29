@@ -4,6 +4,8 @@
 # Needs: node, python3 with `playwright` (+ a Chromium: `playwright install chromium`).
 set -e; cd "$(dirname "$0")"
 node unit.js
+node unit_forms.js
+python3 form_fidelity.py
 python3 data_sanity.py
 (cd ../site && python3 -m http.server 8799 --bind 127.0.0.1 >/dev/null 2>&1 & echo $! > /tmp/amr_ci_srv.pid)
 trap 'kill $(cat /tmp/amr_ci_srv.pid) 2>/dev/null || true' EXIT

@@ -1,8 +1,8 @@
 # IFR AMR Planner
 
 Static, offline-capable web app (PWA) for planning instrument training missions: pick date / aircraft / device, departure +
-destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, **DD 175**,
-**DD 175-1** and the **Grade Sheet ATC call scripts**. No backend, no accounts; inputs are saved in the browser
+destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, the **DD 1801** (DoD International Flight Plan; primary) with **DD 1801-C**, the legacy **DD 175**,
+**DD 175-1** and the **Grade Sheet ATC call scripts** (AWOS/ASOS aware, every fillable blank filled from the plan + FAA data). No backend, no accounts; inputs are saved in the browser
 (localStorage) and named missions can be saved/loaded. Arizona is loaded in v1; the data pipeline and loader are built to scale to all states.
 
 **Live:** https://rcmckaig.github.io/amr-planner/  (open on iPad/iPhone in Safari → Share → *Add to Home Screen*, once, while online)
@@ -13,7 +13,11 @@ destination 1 + destination 2, runway / approach / SID / STAR / weather per airp
 ## Layout
     site/                      everything that gets deployed to GitHub Pages
       index.html, css/, js/, icons/, sw.js, manifest.webmanifest   (all paths are relative -> works under /amr-planner/)
-      js/model.js              pure logic (formulas, wx validation, DD 175 / 175-1 / AMR / script text) - testable in node
+      js/model.js              pure logic (formulas, wx validation, DD 175 / 175-1 / AMR) - testable in node
+      js/scripts.js            Grade Sheet ATC scripts + AWOS/ASOS-vs-ATIS detection + facility lookup
+      js/dd1801.js             DD 1801 / 1801-C field values (workbook mapping)
+      js/forms.js              fills the OFFICIAL DoD PDFs (site/forms/*.pdf) with pdf-lib; vendor/ = pdf-lib + pdf.js (MIT / Apache-2.0)
+      forms/                   (repo root) prepare_forms.py + original/ = the official PDFs as downloaded; site/forms = browser-fillable blanks
       js/data.js               FAA-cycle selection + lazy per-state loader
       js/app.js                UI
       data/manifest.json       cycles + states available; data/<cycle>/<ST>.json = one file per state
@@ -21,9 +25,11 @@ destination 1 + destination 2, runway / approach / SID / STAR / weather per airp
     data/                      pipeline (not deployed)
       config.json              states to build ("AZ" or ["AZ","NM"] or "ALL"), service-worker preload list, airport filter
       refresh.py               checks the FAA for a new cycle; if found: fetch -> build -> merge into site/data
-      fetch_data.py / build_data.py / assemble_site.py / extract_static.py / make_icons.py
+      fetch_data.py / build_data.py / cifp.py / assemble_site.py / extract_static.py / make_icons.py
+                               (cifp.py reads the FAA CIFP for IAF / crossing altitude / missed-approach text; AWOS.csv gives AWOS/ASOS type + phone)
     tests/
-      ci.sh                    what CI runs: unit.js + data_sanity.py + ci_ui.py (headless Chromium, iPhone viewport)
+      ci.sh                    what CI runs: unit.js + unit_forms.js + form_fidelity.py + data_sanity.py + ci_ui.py (headless Chromium, iPhone + iPad)
+      form_fidelity.py         proves the filled PDFs differ from the official blanks only inside the form's fields (max box offset 0.000 pt)
       compare_workbook.py, e2e.py, verify_data_vs_workbook.py, run_local_all.sh
                                local-only regression against the original Excel workbook (the workbook is NOT in this repo; set AMR_XLSM)
     .github/workflows/
@@ -51,8 +57,8 @@ ultralight and glider ports are dropped unless public.
 
 ## Run / test locally
     cd site && python3 -m http.server 8765        # http://localhost:8765/  (service worker needs localhost or https)
-    pip install playwright && playwright install chromium && tests/ci.sh
+    pip install playwright pymupdf && playwright install chromium && tests/ci.sh
 
 ## Known gaps (v1)
-DD 1801 / 1801-C not built; no state picker yet; sun times (BMNT/EENT) are a NOAA approximation; great-circle distances are hints;
+DD 1801 is the 1 May 1987 edition (the current DoD file is a dynamic Adobe-only form of the same edition, so the static 2023 copy is filled); military-only (NGA) approaches are not in FAA CIFP so their fix/altitude blanks stay; no state picker yet; sun times (BMNT/EENT) are a NOAA approximation; great-circle distances are hints;
 no NOTAMs or live weather; tested in headless Chromium, not on physical iOS hardware.

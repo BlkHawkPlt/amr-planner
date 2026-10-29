@@ -6,7 +6,7 @@
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const LS = { cur: 'amr.current.v1', missions: 'amr.missions.v1', settings: 'amr.settings.v1' };
-  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ' }, tab: 'plan' };
+  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ' }, tab: 'plan', fp: '1801', dirtyPlan: false };
   const env = { ap: id => D.ap(id), acft: d => D.acft(d), device: d => D.device(d), get compat() { return S.settings.compat; } };
 
   /* ---------- storage ---------- */
@@ -47,7 +47,7 @@
       ${F('Altimeter', inp(k + '.altim', { attrs: 'inputmode="decimal" maxlength="5"', ph: '29.92' }))}
       </div><div class="msgs" id="msg-${k}"></div>`;
     const ops = `<h3>Procedures</h3><div class="grid g2">
-      ${F('Weather source', sel(k + '.wx', M.WX_SRC))}
+      ${F('Weather source', sel(k + '.wx', M.WX_CHOICES), 'full', `<span class="hint" id="wxh-${k}"></span>`)}
       ${F('Approach in use', `<select data-b="${k}.apr" data-dyn="apr"></select>`)}
       ${F('Runway in use', `<select data-b="${k}.rwy" data-dyn="rwy"></select>`)}
       ${dep ? F('SID / DP (if required)', `<select data-b="dep.sid" data-dyn="sid"></select>`) : F('STAR (if used)', `<select data-b="${k}.star" data-dyn="star"></select>`)}
@@ -140,9 +140,11 @@
     const x = S.m[k], a = D.ap(x.id), el = $('#info-' + k), cnt = $('#cnt-' + k);
     if (!a) {
       el.innerHTML = x.id ? `<span style="color:var(--bad)"><b>${esc(x.id)}</b> not found in the ${S.settings.state} data.</span> Type an FAA/ICAO ID (drop the K only for IDs with numbers - e.g. 02AZ, P08, KTUS).` : 'Pick an airport.';
-      cnt.textContent = ''; return;
+      cnt.textContent = ''; const wh0 = $('#wxh-' + k); if (wh0) wh0.textContent = ''; return;
     }
     cnt.textContent = a.c;
+    const wx = M.wxSource(x, a), wh = $('#wxh-' + k);
+    if (wh) wh.textContent = (wx.auto ? 'Auto: ' : '') + wx.tip + (wx.auto ? ' (' + wx.why + ')' : '');
     el.innerHTML = `<b>${esc(a.n)}</b> &nbsp;elev <b>${a.e == null ? '?' : a.e} ft</b><div class="chips"><span class="chip k">${esc(D.kindLabel(a.k))}</span><span class="chip">${esc(a.v || 'no SIAP vol')}</span><span class="chip">${(a.r || []).length} rwy ends</span><span class="chip">${(a.i || []).length} approaches</span><span class="chip">${(a.d || []).length} SIDs</span><span class="chip">${(a.s || []).length} STARs</span></div>${a.f ? `<div class="freq">${esc(freqText(a))}</div>` : '<div class="freq">No approach/departure/center frequencies in data.</div>'}`;
   }
   function renderMsgs(k) {
@@ -224,6 +226,10 @@
     if (path === 'acft') renderSerial();
     if (/^(d1|d2)\./.test(path) || path === 'noAlt') renderAlt();
     if (path === 'name') $('#missionLabel').textContent = v || 'New mission';
+    if (/^(dep|d1|d2)\.wx$/.test(path)) renderInfo(k);
+    if (S.tab !== 'plan') S.dirtyPlan = true;
+    if (S.tab === 'fp' || S.tab === '1751') schedPdf();
+    else if (S.tab === 'scripts') { const y = window.scrollY; $('#view-scripts').innerHTML = viewScripts(); window.scrollTo(0, y); }
   }
 
   /* ---------- OUTPUT: AMR ---------- */
@@ -246,74 +252,171 @@
   }
 
   /* ---------- OUTPUT: DD 175 ---------- */
-  function viewDD175() {
-    const d = M.dd175(S.m, env), A = S.m.amr, T = M.s;
-    const people = d.people.slice(); while (people.length < 4) people.push({ duty: '', name: '', rank: '', org: '' });
-    const fuelRow = i => `<td colspan="3"><span class="fh">${esc(d.fuelTxt[i])}</span><span class="v">${d.fuel[i]} ${esc(d.unit)}</span></td>`;
-    return `${barHTML()}<div class="scroll-x"><div class="minw"><table class="dd">
-      <tr><td colspan="6" class="sub" style="font-size:8px;line-height:1.2">PRIVACY ACT STATEMENT — AUTHORITY: 10 USC 8012 and EO 9397. PRINCIPAL PURPOSE: To aid in accurate identification of personnel participating in the filed flight. ROUTINE USES: To provide data required to process flight plans with appropriate air traffic service authorities. A file is retained by the agency processing the flight plan. DISCLOSURE: Voluntary; however, failure to provide the SSN could result in denial of flight plan processing.</td>
-        <td colspan="2"><span class="fh">DATE</span><span class="v">${esc(fmtDate(d.date))}</span></td><td colspan="3"><span class="fh">AIRCRAFT CALL SIGN</span><span class="v">${esc(d.callsign)}</span></td><td colspan="2"><span class="fh">AIRCRAFT DESG AND TD CODE</span><span class="v">${esc(d.design)}</span></td></tr>
-      <tr><th>TYPE FLT PLAN</th><th>TRUE AIRSPEED</th><th colspan="2">POINT OF DEPARTURE</th><th colspan="2">PROPOSED DEPARTURE TIME (Z)</th><th>ALTITUDE</th><th colspan="4">ROUTE OF FLIGHT</th><th>TO</th><th>ETE</th></tr>
-      ${legRow(d.leg1)}
-      <tr><td colspan="7"></td><td colspan="4" class="v">${esc(d.mid.k)}</td><td colspan="2" class="v">${esc(d.mid.l)}</td></tr>
-      ${legRow(d.leg2)}
-      <tr><td colspan="6"><span class="fh">REMARKS</span><span class="v">${esc(d.remarksLine)}</span></td><td colspan="1" class="v">${esc(d.leg2.remarks)}</td>${fuelRow(0)}${fuelRow(1)}</tr>
-      <tr><td colspan="7"><span class="fh">&nbsp;</span></td>${fuelRow(2)}<td colspan="3"></td></tr>
-      <tr><td colspan="4"><span class="fh">RANK AND HONOR CODE</span>&nbsp;</td><td colspan="9"></td></tr>
-      <tr><td colspan="2"><span class="fh">FUEL ON BD</span><span class="v">${esc(d.fob)}</span></td><td colspan="2"><span class="fh">ALTN AIRFIELD</span><span class="v">${esc(d.alt)}</span></td><td colspan="2"><span class="fh">ETE TO ALTN</span><span class="v">${esc(d.eteAlt)}</span></td><td colspan="2"><span class="fh">NOTAMS</span>&nbsp;</td><td colspan="2"><span class="fh">WEATHER (VOID / INITIALS)</span><span class="v">${esc(d.weather)}</span></td><td colspan="1"><span class="fh">WT AND BAL</span><span class="v">${esc(d.wb)}</span></td><td colspan="2"><span class="fh">A/C SERIAL, UNIT, HOME STA</span><span class="v">${esc(d.serialUnit)}</span></td></tr>
-      <tr><td colspan="4"><span class="fh">SIGNATURE OF APPROVAL AUTHORITY</span><br>&nbsp;</td><td colspan="5"><span class="fh">CREW / PASSENGER LIST</span> <b>X</b> ATTACHED &nbsp; SEE PSGR</td><td colspan="2"><span class="fh">ACTUAL DEP TIME (Z)</span>&nbsp;</td><td colspan="2"><span class="fh">BASE OPERATIONS USE</span>&nbsp;</td></tr>
-      <tr><th colspan="2">DUTY</th><th colspan="5">NAME AND INITIALS</th><th>RANK</th><th>SSN</th><th colspan="4">ORGANIZATION AND LOCATION</th></tr>
-      ${people.slice(0, 4).map(p => `<tr><td colspan="2" class="v">${esc(p.duty)}</td><td colspan="5" class="v">${esc(p.name)}&nbsp;</td><td class="v">${esc(p.rank)}</td><td>&nbsp;</td><td colspan="4" class="v">${esc(p.org)}</td></tr>`).join('')}
-      <tr><td colspan="13" class="sub">DD Form 175, MAY 86 — Previous editions are obsolete. — MILITARY FLIGHT PLAN (planning copy generated by IFR AMR Planner; transcribe to the official form)</td></tr></table></div></div>
-      <p class="fx noprint" style="margin-top:8px">ETE = ((dist ÷ TAS) × 60 + PT/Hold min) truncated to the minute; TAS = planning TAS + 1 kt per 1000 ft (altitude ÷ 10). ETD leg 2 = ETD + ETE leg 1 + ground time. Fuel = (dist ÷ TAS + (hold + 30 min reserve) ÷ 60) × burn rate.</p>${footer()}`;
-    function legRow(L) { return `<tr><td class="v" style="text-align:center">${esc(L.rules)}</td><td class="v">${esc(L.tas)}</td><td colspan="2" class="v">${esc(L.dep)}</td><td colspan="2" class="v">${esc(L.etd)}</td><td class="v">${esc(L.alt)}</td><td colspan="4" class="v">${esc(L.route)}</td><td class="v">${esc(L.to)}</td><td class="v">${esc(L.ete)}</td></tr>`; }
-  }
   function fmtDate(iso) { const [y, m, d] = String(iso).split('-'); const mo = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][+m - 1]; return `${d}-${mo}-${String(y).slice(2)}`; }
 
-  /* ---------- OUTPUT: DD 175-1 ---------- */
-  const ed = (path, w) => `<input class="edit" data-b="${path}" value="${esc(getp(path))}" ${w ? `style="width:${w}"` : ''} autocomplete="off">`;
+  /* ---------- OFFICIAL FORMS: the DoD PDF is filled with pdf-lib and previewed with pdf.js ---------- */
+  const FORMS = {
+    '1801': { f: 'dd1801', t: 'DD Form 1801 - DoD International Flight Plan', ed: '1 May 1987', pdf: 'DD1801' },
+    '1801c': { f: 'dd1801c', t: 'DD Form 1801-C - Continuation', ed: '21 May 2019', pdf: 'DD1801-C' },
+    '175': { f: 'dd175', t: 'DD Form 175 - Military Flight Plan (legacy)', ed: '1 May 1986', pdf: 'DD175' },
+    '1751': { f: 'dd175-1', t: 'DD Form 175-1 - Flight Weather Briefing', ed: '1 Oct 2002', pdf: 'DD175-1' }
+  };
+  const PDF = { zoom: 'fit', tok: 0, cache: {}, task: null, last: null };
+  const curForm = () => (S.tab === '1751' ? '1751' : S.fp);
+  const pdfLibsOK = () => window.PDFLib && window.pdfjsLib && window.AMRForms;
+  async function pdfAsset(url, json) {
+    if (PDF.cache[url]) return PDF.cache[url];
+    const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status);
+    return (PDF.cache[url] = json ? await r.json() : new Uint8Array(await r.arrayBuffer()));
+  }
+  const sunNow = () => { const a = D.ap(S.m.dep.id); return a && a.p ? M.sun(S.m.date, a.p[0], a.p[1]) : null; };
+  async function buildPdf(fk, flatten) {
+    const def = FORMS[fk], AF = window.AMRForms, W = (await pdfAsset('forms/fields.json', true))[def.f].widgets;
+    const ops = fk === '1801' ? AF.ops1801(W, M.dd1801(S.m, env)) : fk === '1801c' ? AF.ops1801C(W, M.dd1801C(S.m, env))
+      : fk === '175' ? AF.ops175(W, S.m, M.dd175(S.m, env)) : AF.ops1751(W, S.m, M.dd1751(S.m, env), sunNow());
+    return AF.fill(window.PDFLib, await pdfAsset('forms/' + def.f + '.pdf'), ops, { flatten });
+  }
+  async function renderPdf() {
+    const host = $('#pdfhost'); if (!host) return;
+    const fk = curForm(), tok = ++PDF.tok, st = $('#pdfst');
+    try {
+      if (!pdfLibsOK()) throw new Error('PDF libraries are not loaded (open the app once online so they are cached)');
+      const bytes = await buildPdf(fk, true); if (tok !== PDF.tok) return;
+      PDF.last = { fk, bytes };
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+      const doc = await window.pdfjsLib.getDocument({ data: bytes.slice() }).promise, pg = await doc.getPage(1); if (tok !== PDF.tok) return;
+      const base = pg.getViewport({ scale: 1 });
+      const css = PDF.zoom === 'fit' ? Math.max(280, host.clientWidth - 2) : base.width * (4 / 3) * PDF.zoom;    // 100% = 96 dpi (Letter = 816 CSS px)
+      let px = Math.min(window.devicePixelRatio || 1, 3) * css / base.width; const maxPx = 12e6;
+      if (base.width * base.height * px * px > maxPx) px = Math.sqrt(maxPx / (base.width * base.height));
+      const vp = pg.getViewport({ scale: px }), cv = $('#pdfc');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height); cv.style.width = css + 'px'; cv.style.height = (css * base.height / base.width) + 'px';
+      if (PDF.task) { try { PDF.task.cancel(); } catch (e) { } }
+      PDF.task = pg.render({ canvasContext: cv.getContext('2d'), viewport: vp });
+      await PDF.task.promise; if (tok !== PDF.tok) return;
+      if (st) st.textContent = `Official ${FORMS[fk].t}, edition ${FORMS[fk].ed}. This is the real DoD form with your data typed into its own fields - box positions are DoD's.`;
+      host.dataset.ready = fk;
+    } catch (e) {
+      if (e && e.name === 'RenderingCancelledException') return;
+      if (st) st.innerHTML = `<span style="color:var(--bad)">Could not build the form: ${esc(e.message || e)}</span>`;
+      console.error(e);
+    }
+  }
+  let pdfT = null; const schedPdf = () => { clearTimeout(pdfT); pdfT = setTimeout(renderPdf, 180); };
+  const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  async function pdfAction(a) {
+    const fk = curForm(); if (!pdfLibsOK()) { toast('PDF libraries not loaded'); return; }
+    try {
+      const bytes = await buildPdf(fk, a !== 'save'), url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const name = `${FORMS[fk].pdf}_${M.serNum(S.m, env).replace(/[^A-Za-z0-9-]/g, '')}_${S.m.date}.pdf`;
+      if (a === 'save') { const l = document.createElement('a'); l.href = url; l.download = name; document.body.appendChild(l); l.click(); l.remove(); toast('Saved fillable PDF'); }
+      else if (a === 'open' || isIOS()) { if (!window.open(url, '_blank')) location.href = url; if (a === 'print') toast('Tap Share → Print. Leave scaling at 100% (Letter).'); }
+      else {
+        const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; fr.src = url; document.body.appendChild(fr);
+        fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } setTimeout(() => fr.remove(), 60000); };
+        toast('Print dialog: Paper = Letter, Scale = 100% / Actual size (not "Fit")');
+      }
+    } catch (e) { toast('Could not build PDF: ' + (e.message || e)); console.error(e); }
+  }
+  function pdfPanel() {
+    return `<div class="pdfbar noprint"><button class="btn pri" data-pdf="print">Print (100%)</button><button class="btn" data-pdf="open">Open PDF</button><button class="btn" data-pdf="save">Download fillable PDF</button>
+      <span class="zoom"><button class="btn sm" data-zoom="fit">Fit</button><button class="btn sm" data-zoom="1">100%</button><button class="btn sm" data-zoom="1.5">150%</button><button class="btn sm" data-zoom="2">200%</button></span></div>
+      <div class="fx noprint" id="pdfst">Building the official form…</div>
+      <div class="pdfwrap" id="pdfhost"><canvas id="pdfc" aria-label="Filled official form"></canvas></div>
+      <p class="fx noprint">Print the PDF at <b>Letter, 100% / Actual size</b> (never "Fit to page" or "Shrink to fit") so the boxes keep their official size. On iPhone/iPad: Open PDF → Share → Print, and leave scaling at 100%.</p>`;
+  }
+  const wideOpen = () => (window.innerWidth >= 1000 ? 'open' : '');
+  const withCur = (list, cur) => (cur === '' || list.some(x => (Array.isArray(x) ? x[0] : x) === cur)) ? list : list.concat([cur]);
+  const chipSet = (path, list) => { const cur = getp(path) || []; return `<div class="chips pick">${list.map(([c, d]) => `<button type="button" class="chipb${cur.includes(c) ? ' on' : ''}" data-chip="${path}" data-c="${esc(c)}" title="${esc(d)}">${esc(c)}</button>`).join('')}</div>`; };
+
+  /* ---------- Flight plan tab: DD 1801 (primary), 1801-C, DD 175 (legacy) ---------- */
+  function viewFP() {
+    const fk = S.fp, tabs = [['1801', 'DD 1801'], ['1801c', 'DD 1801-C'], ['175', 'DD 175 · legacy']];
+    const nav = `<div class="subnav noprint">${tabs.map(([k, l]) => `<button class="${k === fk ? 'on' : ''}" data-fp="${k}">${l}</button>`).join('')}</div>`;
+    let top = '';
+    if (fk === '1801') top = inputs1801();
+    else if (fk === '1801c') top = `<div class="card"><h2>DD Form 1801-C (continuation)</h2><p class="fx" style="margin:0">Block 1 = leg 2 (${esc(S.m.d1.id)} → ${esc(S.m.d2.id)}); block 2 = ${esc(S.m.d2.id)} → second alternate when one is entered on the Plan tab; block 3 stays blank. Items 7, 8, 10, 15, 18 and 19 follow the DD 1801 inputs.</p></div>`;
+    else top = `<div class="card"><h2>DD Form 175 - legacy</h2><p class="fx" style="margin:0">The DD 175 (May 1986) is kept for units that still use it; the DD 1801 is the primary flight plan. Inputs (ETD, TAS, altitude, route, fuel) are on the Plan tab and shared with the DD 1801.</p></div>`;
+    return `${nav}${pdfPanel()}${top}${footer()}`;
+  }
+  function inputs1801() {
+    const eq = (D.static && D.static.eq) || { nav: [], sur: [], pbn: [] }, d = M.dd1801(S.m, env), P = 'f1801.';
+    const i18 = [['sts', 'STS'], ['nav', 'NAV'], ['com', 'COM'], ['dat', 'DAT'], ['sur', 'SUR'], ['reg', 'REG'], ['eet', 'EET'], ['sel', 'SEL'], ['typ', 'TYP'], ['code', 'CODE'], ['dle', 'DLE'], ['rvr', 'RVR'], ['opr', 'OPR'], ['orgn', 'ORGN'], ['per', 'PER'], ['altn', 'ALTN'], ['ralt', 'RALT'], ['talt', 'TALT'], ['rif', 'RIF'], ['rmk', 'RMK']];
+    const warn = M.check1801(S.m, env).map(w => `<div class="msg ${w.level}">${esc(w.msg)}</div>`).join('');
+    return `<details class="card inp" ${wideOpen()}><summary class="h2">DD 1801 inputs <small>blank = automatic</small></summary>${warn}
+      <div class="grid g4">
+      ${F('Item 7 aircraft id', `<input value="${esc(d.acid)}" disabled>`, '', '<span class="hint">from serial / N-number</span>')}
+      ${F('Priority', sel(P + 'priority', ['FF', 'SS', 'DD', 'GG', 'KK']))}
+      ${F('Item 8 flight rules', sel(P + 'rules', [['I', 'I - IFR'], ['V', 'V - VFR'], ['Y', 'Y - IFR then VFR'], ['Z', 'Z - VFR then IFR']], 'auto (' + d.rules + ')'))}
+      ${F('Type of flight', sel(P + 'type', [['M', 'M - military'], ['G', 'G - general aviation'], ['S', 'S - scheduled'], ['N', 'N - non-scheduled'], ['X', 'X - other']]))}
+      ${F('Item 9 number', inp(P + 'number', { ph: 'blank', attrs: 'maxlength="2" inputmode="numeric"' }))}
+      ${F('Wake category', sel(P + 'wake', [['L', 'L - light'], ['M', 'M - medium'], ['H', 'H - heavy'], ['J', 'J - super']], 'auto (' + d.wake + ')'))}
+      ${F('Filing time (DDHHMM)', inp(P + 'filing', { ph: d.filing }))}
+      ${F('Originator', inp(P + 'origin', { ph: d.originator || '' }))}
+      ${F('Addressee 1', inp(P + 'addr.0', { ph: 'e.g. KZAB' }))}${F('Addressee 2', inp(P + 'addr.1'))}${F('Addressee 3', inp(P + 'addr.2'))}
+      ${F('Item 19 POB', inp(P + 'pob', { ph: String(d.pob || ''), attrs: 'inputmode="numeric"' }))}
+      ${F('Item 19 RDO', inp(P + 'rdo', { ph: 'blank' }))}${F('Extra remarks', inp(P + 'rmkExtra', { ph: 'appended to RMK' }), 'span2')}
+      </div>
+      <details open><summary>Item 10 - equipment &amp; surveillance (tap to toggle)</summary>
+        <div class="f"><label>Radio / navigation / approach aids</label>${chipSet(P + 'nav', eq.nav)}</div>
+        <div class="f"><label>Surveillance (SSR / ADS-B)</label>${chipSet(P + 'surv', eq.sur)}</div>
+        <div class="f"><label>PBN capabilities (item 18 PBN/)</label>${chipSet(P + 'pbn', eq.pbn)}</div></details>
+      <details><summary>Item 18 - other information (extra entries)</summary><div class="grid g4">${i18.map(([k, l]) => F(l + '/', inp(P + 'i18.' + k, { ph: '' }))).join('')}</div>
+        <p class="fx">Generated entries (PBN/, DEP/, DEST/, DOF/ …) are added automatically; anything typed here is added after them.</p></details>
+      <div class="grid g2"><div class="f chk"><input type="checkbox" data-b="${P}crewLoc" ${S.m.f1801.crewLoc ? 'checked' : ''} id="cl1"><label for="cl1">Crew list "LOCATED AT" departure</label></div><div class="f chk"><input type="checkbox" data-b="${P}paxLoc" ${S.m.f1801.paxLoc ? 'checked' : ''} id="cl2"><label for="cl2">Passenger manifest "LOCATED AT" departure</label></div></div></details>`;
+  }
+
+  /* ---------- DD 175-1 tab: official form + inputs ---------- */
   function viewDD1751() {
-    const o = M.dd1751(S.m, env), F1 = S.m.f1751, a = D.ap(S.m.dep.id);
-    const sun = a && a.p ? M.sun(S.m.date, a.p[0], a.p[1]) : null;
-    const v = (k, d) => F1[k] || (sun && sun[d]) || '';
-    const rowsHTML = o.part3.map(r => `<tr><td class="v">${esc(r.id)}<span class="fh">${esc(r.label)}</span></td><td class="v">${esc(r.from)}Z – ${esc(r.to)}Z</td><td class="v">${esc(r.wind)}</td><td class="v">${esc(r.vis)}</td><td class="v">${esc(r.cloud)}</td><td class="v">${esc(r.altim)}</td><td class="v">${esc(r.temp)}</td><td class="v">${esc(r.pa)}</td></tr>`).join('');
-    return `${barHTML()}<h1 style="font-size:18px">FLIGHT WEATHER BRIEFING</h1><div class="scroll-x"><div class="minw">
-      <h2>PART I - TAKEOFF DATA</h2><table class="dd"><tr><th>1. Date</th><th>2. Acft type/no.</th><th>3. Dep pt/ETD</th><th>4. Rwy temp (C)</th><th>5. Dewpoint (C)</th><th>6. Temp dev</th><th>7. Pres alt (ft)</th><th>8. Density alt (ft)</th></tr>
-      <tr><td class="v">${esc(fmtDate(o.date))}</td><td class="v">${esc(o.acft)}</td><td class="v">${esc(o.dep)}Z</td><td class="v">${esc(o.rwyTemp)}</td><td class="v">${esc(o.dew)}</td><td class="v">${esc(o.tempDev)}</td><td class="v">${esc(o.pa)}</td><td class="v">${esc(o.da)}</td></tr></table>
-      <table class="dd"><tr><th>9. Sfc wind (M)</th><th>10. Climb winds</th><th>Layer</th><th colspan="2">11. Local WX watch/warning/advisory</th><th>12. RSC/RCR</th></tr>
-      <tr><td class="v">${esc(o.sfcWind)}</td><td class="v">${esc(o.climbWinds)}</td><td>${ed('f1751.climbLayer')}</td><td colspan="2">${ed('f1751.watch')}</td><td class="v">N/A</td></tr>
-      <tr><td colspan="6"><span class="fh">13. REMARKS</span><span class="v">${esc(o.remarks13)}</span></td></tr></table>
-      <h2>PART II - ENROUTE &amp; MISSION DATA</h2><table class="dd">
-      <tr><td colspan="2"><span class="fh">14. Flt level / winds / temp</span><span class="v">${esc(o.flWinds)}</span> &nbsp;SEE ATTACHED</td><td colspan="2"><span class="fh">15. Space weather (FREQ / GPS / RAD)</span>${ed('f1751.space')}</td><td colspan="3"><span class="fh">16. Solar/lunar (Z at ${esc(S.m.dep.id)})</span>BMNT ${ed('f1751.bmnt', '70px').replace('value="' + esc(F1.bmnt) + '"', 'value="' + esc(v('bmnt', 'bmnt')) + '"')} SR ${ed('f1751.sr', '70px').replace('value="' + esc(F1.sr) + '"', 'value="' + esc(v('sr', 'sr')) + '"')} SS ${ed('f1751.ss', '70px').replace('value="' + esc(F1.ss) + '"', 'value="' + esc(v('ss', 'ss')) + '"')} EENT ${ed('f1751.eent', '70px').replace('value="' + esc(F1.eent) + '"', 'value="' + esc(v('eent', 'eent')) + '"')}</td></tr>
-      <tr><td><span class="fh">17. Clouds at flt level</span>${ed('f1751.cloudsFL')}</td><td colspan="2"><span class="fh">18. Obscurations restricting vis</span>${ed('f1751.obsc')}</td><td><span class="fh">Type</span>${ed('f1751.obscType')}</td><td><span class="fh">19. Min ceiling - location</span><span class="v">${esc(o.minCeil)}</span></td><td><span class="fh">20. Max cloud tops (FT AGL)</span>${ed('f1751.cloudTops')}</td><td><span class="fh">21. Min freezing lvl (FT AGL)</span>${ed('f1751.frz')}</td></tr>
-      <tr><td><span class="fh">22. Thunderstorms</span>${ed('f1751.tstm')}</td><td colspan="2"><span class="fh">23. Turbulence</span>${ed('f1751.turb')}</td><td><span class="fh">in clear / cloud</span>${ed('f1751.turbWhere')}</td><td><span class="fh">24. Icing</span>${ed('f1751.icing')}</td><td colspan="2"><span class="fh">25. Precipitation</span>${ed('f1751.precip')}</td></tr></table>
-      <h2>PART III - AERODROME FORECASTS</h2><table class="dd"><tr><th>26. Dest / altn</th><th>27. Valid time (default ETA −1/+1 h; TEMPO ±15 min)</th><th>28. Sfc wind</th><th>29. Vsby/WX</th><th>30. Cloud layers</th><th>31. Altimeter</th><th>Rwy temp C</th><th>Pres alt ft</th></tr>${rowsHTML}</table>
-      <h2>PART IV - COMMENTS/REMARKS</h2><table class="dd"><tr><td colspan="4"><span class="fh">32. Briefed RSC/RCR</span>${ed('f1751.rscBriefed')}</td><td colspan="2"><span class="fh">33. PMSV</span>${ed('f1751.pmsv')}</td><td colspan="2"><span class="fh">34. Attachments</span>${ed('f1751.attach')}</td></tr>
-      <tr><td colspan="8"><span class="fh">35. REMARKS — NOTAMS</span>${pre(F1.notams) || '&nbsp;'}</td></tr></table>
-      <h2>PART V - BRIEFING RECORD</h2><table class="dd"><tr><td><span class="fh">36. WX briefed time</span><span class="v">${esc(o.briefTime)}Z</span></td><td><span class="fh">37. Flimsy briefing no.</span>${ed('f1751.flimsy')}</td><td><span class="fh">38. Forecaster's initials</span>${ed('f1751.init')}</td><td colspan="2"><span class="fh">39. Name of person receiving briefing</span>${ed('f1751.recvName')}</td></tr>
-      <tr><td><span class="fh">40. Void time</span><span class="v">${esc(o.wxVoid)}Z</span></td><td colspan="2"><span class="fh">41. Extended to/initials</span>&nbsp;</td><td><span class="fh">42. WX rebrief time/initials</span>&nbsp;</td><td><span class="fh">43. WX debrief time/initials</span>&nbsp;</td></tr>
-      <tr><td colspan="5" class="sub">DD FORM 175-1, OCT 2002 — PREVIOUS EDITION MAY BE USED. (Planning copy; transcribe to the official form / obtain the official weather brief.)</td></tr></table></div></div>
-      <p class="fx noprint">${env.compat ? 'Workbook-compatible mode: density altitude and Dest-1 pressure altitude use the original workbook formulas.' : 'Density altitude = PA + 120 × (OAT − ISA) with ISA = 15 − 2 × PA/1000. (The old workbook has a misplaced parenthesis; turn on workbook-compatible mode on the Info tab to reproduce it.)'} Sun times are computed from the departure airport position; edit any value to override.</p>${footer()}`;
+    const F1 = S.m.f1751, T = (l, path, ph, cls) => F(l, inp(path, { ph }), cls);
+    const lv = ['LIGHT', 'MODERATE', 'SEVERE'];
+    const icing = ['NONE', 'TRACE RIME'].concat(['RIME', 'MIXED', 'CLEAR'].flatMap(t => ['LIGHT', 'MODERATE', 'SEVERE'].map(l => `${l} ${t}`)));
+    const precip = ['NONE'].concat(['DRIZZLE', 'RAIN', 'SNOW', 'PELLET'].flatMap(t => ['LIGHT', 'MODERATE', 'HEAVY'].map(l => `${l} ${t}`)), ['SHOWERS RAIN', 'SHOWERS SNOW', 'FREEZING DRIZZLE', 'FREEZING RAIN']);
+    const S1 = (l, p, list, cls) => F(l, sel('f1751.' + p, withCur(list, F1[p] || '')), cls);
+    return `${pdfPanel()}<details class="card inp" ${wideOpen()}><summary class="h2">DD 175-1 inputs</summary><details open><summary>Part I &amp; II</summary><div class="grid g4">
+      ${T('Climb layer', 'f1751.climbLayer', 'SFC-050')}${T('11. Watch/warning', 'f1751.watch', '')}${T('14. Flight level', 'f1751.fl', '040')}${S1('15. Space weather', 'space', ['NO IMPACT', 'MARGINAL', 'SEVERE'])}
+      ${T('BMNT (Z)', 'f1751.bmnt', 'auto')}${T('SR (Z)', 'f1751.sr', 'auto')}${T('SS (Z)', 'f1751.ss', 'auto')}${T('EENT (Z)', 'f1751.eent', 'auto')}
+      ${S1('17. Clouds at FL', 'cloudsFL', ['YES', 'NO', 'IN AND OUT'])}${S1('18. Obscurations', 'obsc', ['NO', 'YES'])}${T('Obscuration type', 'f1751.obscType', '')}${T('19. Min ceiling / loc', 'f1751.minCeil', 'auto')}
+      ${T('20. Max cloud tops (MSL)', 'f1751.cloudTops', '110')}${T('21. Min freezing lvl (MSL)', 'f1751.frz', '100')}${S1('22. Thunderstorms', 'tstm', ['NONE', 'AREA', 'LINE'])}${S1('23. Turbulence', 'turb', ['NONE'].concat(lv, 'EXTREME'))}
+      ${S1('Turbulence where', 'turbWhere', ['IN CLEAR', 'IN CLOUD'])}${S1('24. Icing', 'icing', icing)}${S1('25. Precipitation', 'precip', precip)}</div></details>
+      <details><summary>Part III valid times (blank = ETA ∓ 1 h, TEMPO ± 15 min)</summary><div class="grid g4">
+      ${T('Dest 1 from', 'f1751.v1a', 'auto')}${T('Dest 1 to', 'f1751.v1b', 'auto')}${T('Dest 2 from', 'f1751.v2a', 'auto')}${T('Dest 2 to', 'f1751.v2b', 'auto')}</div></details>
+      <details open><summary>Part IV &amp; V</summary><div class="grid g4">
+      ${S1('32. Briefed RSC/RCR', 'rscBriefed', ['NOT AVAILABLE', 'YES'])}${T('33. PMSV', 'f1751.pmsv', '306.5')}${S1('34. Attachments', 'attach', ['YES', 'NO'])}${T('36. Brief time (Z)', 'f1751.briefTime', '1900')}
+      ${T('37. Flimsy no.', 'f1751.flimsy', '')}${T("38. Briefer's initials", 'f1751.init', 'EO')}${T('39. Person briefed', 'f1751.recvName', '', 'span2')}
+      <div class="f full"><label>35. Remarks / NOTAMs</label>${area('f1751.notams', 'one per line')}</div></div></details>
+      <p class="fx">${env.compat ? 'Workbook-compatible mode: density altitude and Dest-1 pressure altitude use the original workbook formulas.' : 'Density altitude = PA + 120 × (OAT − ISA), ISA = 15 − 2 × PA/1000 (the workbook has a misplaced parenthesis; Info → workbook-compatible mode reproduces it).'} Sun times come from the departure airport position.</p></details>${footer()}`;
   }
 
   /* ---------- OUTPUT: Scripts (Grade Sheet) ---------- */
+  const mark = t => esc(t).replace(/\u27E6/g, '<span class="fv">').replace(/\u27E7/g, '</span>').replace(/\u27EA/g, '<span class="bk">[').replace(/\u27EB/g, ']</span>');
   function viewScripts() {
-    const c = M.calls(S.m, env), g = c.grade, m = S.m;
-    const sc = (title, text, alt) => `<div class="script"><h3>${esc(title)}<button class="btn sm" data-copy="${esc(text)}">Copy</button></h3><p>${esc(text)}</p></div>${alt ? `<div class="alt">${alt}</div>` : ''}`;
-    const fr = k => { const a = D.ap(m[k].id); return a ? `<div class="script"><h3>${esc(APN[k])} - ${esc(m[k].id)}</h3><p>${esc(freqText(a)) || 'No A/D or CNTR frequencies in data'}</p></div>` : ''; };
+    const c = M.calls(S.m, env), g = c.grade, m = S.m, h = c.hdr;
+    const sc = (title, key, hk) => g[key] === '' || g[key] == null ? '' : `<div class="script"><h3>${esc(title)}<button class="btn sm" data-copy="${esc(M.plain(g[key]))}">Copy</button></h3>${h[hk || key] ? `<div class="facl">${esc(h[hk || key])}</div>` : ''}<p>${mark(g[key])}</p></div>`;
+    const left = [...new Set(Object.values(g).flatMap(t => M.blanks(t)))];
+    const ctl = k => {
+      const x = m[k], a = D.ap(x.id), w = c.src[k];
+      return `<div class="sctl"><b>${esc(APN[k])} ${esc(x.id)}</b>
+        <label>Weather<select data-b="${k}.wx">${optList(M.WX_CHOICES, x.wx || 'AUTO')}</select></label>
+        <label>Approach<select data-b="${k}.apr">${optList((a && a.i) || [], x.apr, '— none —')}</select></label>
+        <label>Runway<select data-b="${k}.rwy">${optList((a && a.r) || [], x.rwy, '— runway —')}</select></label>
+        ${k === 'dep' ? `<label>SID<select data-b="dep.sid">${optList((a && a.d) || [], x.sid, '— none —')}</select></label>` : `<label>STAR<select data-b="${k}.star">${optList((a && a.s) || [], x.star, '— none —')}</select></label>`}
+        <div class="fx" style="grid-column:1/-1">${esc((w.auto ? 'Auto: ' : '') + w.tip)}</div></div>`;
+    };
     return `<div class="outbar"><button class="btn pri" data-act="print">Print / Save PDF</button><button class="btn" data-act="goplan">Edit inputs</button></div>
+      <div class="card noprint"><h2>Script settings <small>updates live with the plan</small></h2><div class="sctls">${ctl('dep')}${ctl('d1')}${ctl('d2')}</div>
+        <p class="fx" style="margin:6px 0 0"><span class="fv">Blue</span> = filled from your plan, the AMR inputs and FAA data. <span class="bk">[red]</span> = ATC assigns it live, so nothing can fill it${left.length ? ': ' + esc(left.join(', ')) : ''}.</p></div>
       <div class="script"><h3>Grade sheet setup</h3><p>${esc(g.cockpit)}   •   ${esc(g.simTemp)}   •   Date ${esc(fmtDate(m.date))}</p></div>
       <div class="s2"><div>
-      <h3 style="margin:4px 0">DEPARTURE</h3>
-      ${sc('Departure weather (' + m.dep.wx + ')', g.depWx)}${sc('Clearance delivery (' + m.dep.cd + ')', g.cd)}${sc('Taxi', g.taxi)}${sc('Takeoff', g.takeoff)}${sc('Handoff', g.handoff1)}${sc('Departure control', g.depCtl)}${sc('Handoff', g.contact)}
-      <h3 style="margin:4px 0">DESTINATION 1 - ${esc(m.d1.id)}</h3>
-      ${sc('Destination 1 weather (' + m.d1.wx + ')', g.d1Wx)}${sc('Approach information', g.d1Info)}${sc('Approach clearance (' + m.d1.ac.replace(/\s+/g, ' ') + ')', g.d1Clr)}${sc('Alternate phrasing - cross fix', g.d1Cross)}${sc('Cancel IFR', g.d1Cancel)}${sc('Tower (or)', g.d1Tower)}
+      <h3 style="margin:4px 0">DEPARTURE - ${esc(m.dep.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.dep.tip)}</div>
+      ${sc('Departure weather (' + c.src.dep.label + ')', 'depWx')}${sc('Clearance delivery (' + m.dep.cd + ')', 'cd')}${sc('Taxi', 'taxi')}${sc('Takeoff', 'takeoff')}${sc('Handoff', 'handoff1')}${sc('Departure control', 'depCtl')}${sc('Handoff', 'contact')}${sc('Handoff to Center', 'toApp1')}
+      <h3 style="margin:4px 0">DESTINATION 1 - ${esc(m.d1.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.d1.tip)}</div>
+      ${sc('Destination 1 weather (' + c.src.d1.label + ')', 'd1Wx')}${sc('Approach information', 'd1Info')}${sc('Approach clearance (' + m.d1.ac.replace(/\s+/g, ' ') + ')', 'd1Clr')}${sc('Alternate phrasing - cross fix', 'd1Cross')}${sc('Cancel IFR', 'd1Cancel')}${sc('Tower (or)', 'd1Tower')}
       </div><div>
       <h3 style="margin:4px 0">MISSED APPROACH</h3>
-      ${sc('Missed approach - handoff', g.missed1)}${sc('Approach control', g.missed2)}${sc('Hold / expect further clearance', g.missed3)}
-      <h3 style="margin:4px 0">CLEARANCE TO DESTINATION 2 - ${esc(m.d2.id)}</h3>
-      ${sc('Clearance to 2nd destination', g.toD2)}${sc('Handoff', g.handoff2)}${sc('Destination 2 weather (' + m.d2.wx + ')', g.d2Wx)}${sc('Destination 2 approach information', g.d2Info)}${sc('Destination 2 approach clearance (' + m.d2.ac.replace(/\s+/g, ' ') + ')', g.d2Clr)}${sc('Alternate phrasing - cross fix', g.d2Cross)}${sc('Cancel IFR', g.d1Cancel)}${sc('Contact tower', g.d2ContactTwr)}${sc('Destination 2 tower', g.d2Tower)}
-      <h3 style="margin:4px 0">FREQUENCIES (from FAA data)</h3>${fr('dep')}${fr('d1')}${fr('d2')}
+      ${sc('Missed approach - handoff', 'missed1')}${sc('Approach control', 'missed2')}${sc('Hold / expect further clearance', 'missed3')}${sc('Published missed approach (from the procedure)', 'missedPub', 'missed3')}
+      <h3 style="margin:4px 0">CLEARANCE TO DESTINATION 2 - ${esc(m.d2.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.d2.tip)}</div>
+      ${sc('Clearance to 2nd destination', 'toD2')}${sc('Handoff', 'handoff2')}${sc('Handoff to Center', 'toApp2')}${sc('Destination 2 weather (' + c.src.d2.label + ')', 'd2Wx')}${sc('Destination 2 approach information', 'd2Info')}${sc('Destination 2 approach clearance (' + m.d2.ac.replace(/\s+/g, ' ') + ')', 'd2Clr')}${sc('Alternate phrasing - cross fix', 'd2Cross')}${sc('Cancel IFR', 'd2Cancel')}${sc('Contact tower', 'd2ContactTwr')}${sc('Destination 2 tower', 'd2Tower')}
       </div></div>${footer()}`;
   }
 
@@ -337,6 +440,14 @@
     <section class="card"><h2>Weather entry tips</h2><ul class="fx" style="color:var(--ink);padding-left:18px;margin:0">
       <li>Airport IDs: all caps, 4-letter ICAO; if the ID has a number drop the K (02AZ, P08).</li><li>Visibility must be below 3 and have a reason (BR, RA, -RA …) for an IMC scenario.</li><li>Don't use altimeter settings that end in "0".</li><li>Ceiling altitude is in hundreds of feet (006 = 600 ft).</li><li>SID transition: pick from the NASR list or type it.</li><li>Select ATC / ASOS / ATIS source and clearance types from the drop-downs.</li></ul>
       <h3>WX codes</h3><table class="ref">${WXREF.map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join('')}</table></section>
+    <section class="card wide"><h2>Official forms</h2>
+      <table class="ref"><tr><td><b>DD Form 1801</b></td><td>DoD International Flight Plan - edition 1 May 1987 (primary flight plan)</td></tr>
+      <tr><td><b>DD Form 1801-C</b></td><td>Continuation - edition 21 May 2019</td></tr>
+      <tr><td><b>DD Form 175</b></td><td>Military Flight Plan - edition 1 May 1986 (legacy; kept for units that still use it)</td></tr>
+      <tr><td><b>DD Form 175-1</b></td><td>Flight Weather Briefing - edition 1 Oct 2002</td></tr></table>
+      <p class="fx">The forms are the official DoD PDFs (esd.whs.mil/Directives/forms). Your data is typed into the form's own fields, so every box is where DoD put it; page size is Letter (the DD 175 is Letter landscape). Print at <b>100% / Actual size</b>. To make the PDFs fillable in a browser, the build removes the PDF's encryption (empty user password), its Adobe-only XFA layer and its screen-only Reset/Signature buttons - the printed page itself is untouched (verified by tests/form_fidelity.py). Not an official DoD product; verify the filed plan against current regulations.</p>
+      <p class="fx"><b>Approach fixes, crossing altitudes and missed approaches</b> come from the FAA Coded Instrument Flight Procedures (CIFP, ARINC 424-18; not copyrighted). CIFP is provided "as is" with no warranty; under 10 U.S.C. 456 no civil action may be brought against the United States on the basis of the content of a navigational aid prepared or disseminated by the FAA. The FAA is not responsible for products derived from CIFP, and DoD-originated (NGA) procedures are not in it - those scripts keep a blank. Always use the published procedure; report suspected CIFP errors to the FAA (9-AMC-Aerochart@faa.gov, 800-638-8972).</p>
+      <p class="fx"><b>Weather source:</b> AWOS/ASOS airports have no ATIS letter. Auto picks ATIS when the FAA data lists an ATIS frequency, otherwise AWOS/ASOS (type, phone and frequency from NASR); override per airport on the Plan or Scripts tab.</p></section>
     <section class="card wide"><h2>About</h2><p class="fx">IFR AMR Planner v${VERSION}. Replaces the Cheat Sheet → AMR / DD 175 / DD 175-1 / Grade Sheet workflow of the Army instrument AMR Excel template. Works offline after the first load; add to the Home Screen from Safari's Share menu. Missions are saved only in this browser (localStorage) - use Missions → Export to back them up. Not covered in v1: DD 1801 / 1801-C, other states, ADS-B/winds-aloft/live weather.</p></section></div>`;
   }
 
@@ -344,13 +455,14 @@
   function renderView() {
     const t = S.tab;
     if (t === 'amr') $('#view-amr').innerHTML = viewAMR();
-    else if (t === '175') $('#view-175').innerHTML = viewDD175();
-    else if (t === '1751') $('#view-1751').innerHTML = viewDD1751();
+    else if (t === 'fp') { $('#view-fp').innerHTML = viewFP(); renderPdf(); }
+    else if (t === '1751') { $('#view-1751').innerHTML = viewDD1751(); renderPdf(); }
     else if (t === 'scripts') $('#view-scripts').innerHTML = viewScripts();
     else if (t === 'info') { $('#view-info').innerHTML = viewInfo(); wireInfo(); }
   }
   function setTab(t) {
     S.tab = t; document.body.dataset.view = t;
+    if (t === 'plan' && S.dirtyPlan) { S.dirtyPlan = false; $('#view-plan').innerHTML = planHTML(); afterPlan(); }
     $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
     renderView(); window.scrollTo(0, 0);
   }
@@ -424,14 +536,22 @@
     try { await navigator.clipboard.writeText(t); toast('Copied AMR text'); } catch (e) { prompt('Copy:', t); }
   }
 
+  const printNow = () => { if (S.tab === 'fp' || S.tab === '1751') pdfAction('print'); else window.print(); };
   /* ---------- global wiring ---------- */
   function wire() {
     document.addEventListener('input', onField); document.addEventListener('change', onField);
     $('#tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) setTab(b.dataset.tab); });
     $('#btnMissions').addEventListener('click', openMissions);
-    $('#btnPrint').addEventListener('click', () => window.print());
+    $('#btnPrint').addEventListener('click', printNow);
     document.addEventListener('click', e => {
-      const a = e.target.closest('[data-act]'); if (a) { if (a.dataset.act === 'print') window.print(); else if (a.dataset.act === 'share') share(); else if (a.dataset.act === 'goplan') setTab('plan'); }
+      const pa = e.target.closest('[data-pdf]'); if (pa) { pdfAction(pa.dataset.pdf); return; }
+      const zb = e.target.closest('[data-zoom]'); if (zb) { PDF.zoom = zb.dataset.zoom === 'fit' ? 'fit' : +zb.dataset.zoom; renderPdf(); return; }
+      const fb = e.target.closest('[data-fp]'); if (fb) { S.fp = fb.dataset.fp; renderView(); return; }
+      const ch = e.target.closest('[data-chip]'); if (ch) {
+        const path = ch.dataset.chip, list = $$(`[data-chip="${path}"]`).map(b => b.dataset.c), cur = new Set(getp(path) || []);
+        cur.has(ch.dataset.c) ? cur.delete(ch.dataset.c) : cur.add(ch.dataset.c); setp(path, list.filter(c => cur.has(c))); ch.classList.toggle('on'); save(); schedPdf(); return;
+      }
+      const a = e.target.closest('[data-act]'); if (a) { if (a.dataset.act === 'print') printNow(); else if (a.dataset.act === 'share') share(); else if (a.dataset.act === 'goplan') setTab('plan'); }
       const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard && navigator.clipboard.writeText(c.dataset.copy).then(() => toast('Copied'), () => { }); }
       if (e.target.id === 'btnGC') {
         const p = x => { const a = D.ap(x.id); return a && a.p; }, F1 = S.m.f175, pr = (a, b, f) => { if (p(a) && p(b)) { F1[f] = String(Math.round(M.nm(p(a), p(b)))); const el = $(`[data-b="f175.${f}"]`); el && (el.value = F1[f]); } };
@@ -453,7 +573,7 @@
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('sw.js').catch(() => { });
     }
-    window.__amr = { S, M, D, env, setTab, renderView };       // handy for tests
+    window.__amr = { S, M, D, env, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
     document.body.dataset.ready = '1';
   }
   boot().catch(e => { document.body.insertAdjacentHTML('afterbegin', `<pre style="color:#b00;padding:12px">Failed to start: ${esc(e.message)}</pre>`); console.error(e); });
