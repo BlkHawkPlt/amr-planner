@@ -114,9 +114,10 @@ with sync_playwright() as p:
     t = pg.inner_text('#view-amr'); check('AMR shows the three airports', all(x in t for x in ('(TUS)', '(RYN)', '(DMA)')))
     if SHOTS: pg.screenshot(path=f'{SHOTS}/live_iphone_amr.png', full_page=True)
     suite(pg, 'iphone')
+    n_on = len(errs)      # while offline the update check (version.json) cannot reach the network; the browser logs that as a console error - expected
     ctx.set_offline(True); pg.reload(); pg.wait_for_selector('body[data-ready="1"]', timeout=20000)
     check('offline reload works (served by service worker)', pg.evaluate('!!__amr.D.ap("KTUS")') and ('cycle ' + str(exp)) in pg.inner_text('#cycBadge'))
-    ctx.set_offline(False)
+    ctx.set_offline(False); errs[n_on:] = [e for e in errs[n_on:] if 'ERR_FAILED' not in e and 'ERR_INTERNET_DISCONNECTED' not in e]
     check('no console/page errors', not errs, str(errs[:3]))
     # ---- iPad (portrait) pass over the same tabs
     c2 = b.new_context(viewport={'width': 820, 'height': 1180}, device_scale_factor=2, has_touch=True, is_mobile=True)
