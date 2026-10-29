@@ -8,7 +8,8 @@
    "states": {
     "AZ": {
      "url": "data/2610/AZ.json",
-     "airports": 200
+     "airports": 200,
+     "pre": true
     }
    }
   },
@@ -20,7 +21,8 @@
    "states": {
     "AZ": {
      "url": "data/2611/AZ.json",
-     "airports": 200
+     "airports": 200,
+     "pre": true
     }
    }
   }
