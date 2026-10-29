@@ -1,0 +1,6 @@
+{
+  "_comment": "states: list of 2-letter codes, or \"ALL\" for every state/territory (about 2 MB raw / 0.46 MB gzip per cycle). preload: states the service worker caches up front for offline use (the rest are cached when first opened). filter: training = public-use + military airports/heliports + private heliports; all = everything open.",
+  "states": ["AZ"],
+  "preload": ["AZ"],
+  "filter": "training"
+}

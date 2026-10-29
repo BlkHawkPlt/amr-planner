@@ -1,0 +1,29 @@
+{
+ "cycles": [
+  {
+   "tpp": "2610",
+   "nasr": "2026-10-01",
+   "from": "2026-10-01T09:01Z",
+   "to": "2026-10-29T09:01Z",
+   "states": {
+    "AZ": {
+     "url": "data/2610/AZ.json",
+     "airports": 200
+    }
+   }
+  },
+  {
+   "tpp": "2611",
+   "nasr": "2026-10-29",
+   "from": "2026-10-29T09:01Z",
+   "to": "2026-11-26T09:01Z",
+   "states": {
+    "AZ": {
+     "url": "data/2611/AZ.json",
+     "airports": 200
+    }
+   }
+  }
+ ],
+ "filter": "training"
+}

@@ -1,0 +1,76 @@
+name: Refresh FAA data (28-day cycle)
+
+# Runs daily. data/refresh.py checks whether the FAA has posted the NASR + d-TPP files for the current/next 28-day cycle and
+# only rebuilds when a cycle is new. If it rebuilt: run the tests, commit the new site/data to main, then redeploy Pages.
+# If the tests fail nothing is committed and nothing is deployed.
+on:
+  schedule:
+    - cron: '17 9 * * *'      # 09:17 UTC daily (new cycles take effect 09:01Z)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild even if the cycle is already shipped'
+        type: boolean
+        default: false
+      states:
+        description: 'Override states, e.g. AZ,NM or ALL (default: data/config.json)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    outputs:
+      committed: ${{ steps.commit.outputs.committed }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Check FAA for a new cycle and rebuild
+        id: refresh
+        env:
+          FORCE: ${{ inputs.force }}
+          STATES: ${{ inputs.states }}
+        run: |
+          ARGS=""
+          [ "$FORCE" = "true" ] && ARGS="$ARGS --force"
+          [ -n "$STATES" ] && ARGS="$ARGS --states $STATES"
+          python3 data/refresh.py $ARGS
+      - name: Install Playwright + Chromium
+        if: steps.refresh.outputs.changed == 'true'
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Tests on the rebuilt data
+        if: steps.refresh.outputs.changed == 'true'
+        run: tests/ci.sh
+      - name: Commit new data
+        id: commit
+        if: steps.refresh.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data
+          if git diff --cached --quiet; then echo "committed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git commit -m "Refresh FAA data: cycles ${{ steps.refresh.outputs.cycles }}"
+          git push origin HEAD:main
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: refresh
+    if: needs.refresh.outputs.committed == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

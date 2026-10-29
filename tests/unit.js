@@ -1,0 +1,18 @@
+const M = require('../site/js/model.js'); let n = 0, f = 0;
+const eq = (l, a, b) => { n++; if (JSON.stringify(a) !== JSON.stringify(b)) { f++; console.log('FAIL', l, JSON.stringify(a), '!=', JSON.stringify(b)); } };
+const lv = (w) => M.validateWx(Object.assign({ wind: '090', ws: '10', vis: '1 FG', ct: 'OVC', ceil: '002', temp: '18', dp: '17', altim: '29.92' }, w), 100).map(x => x.level + ':' + x.msg.slice(0, 22));
+eq('ok wx', lv({}), []);
+eq('vis no reason', lv({ vis: '5' }).some(x => x.startsWith('warn')), true);
+eq('vis >=3 tip', lv({ vis: '3 BR' }).some(x => x.startsWith('tip')), true);
+eq('bad reason', lv({ vis: '1 XX' }).some(x => x.startsWith('warn')), true);
+eq('dew>temp', lv({ dp: '20' }).some(x => x.includes('Dew point')), true);
+eq('altim 0 tip', lv({ altim: '29.90' }).some(x => x.startsWith('tip')), true);
+eq('altim format', lv({ altim: '2992' }).some(x => x.startsWith('warn')), true);
+eq('ceil fmt', lv({ ceil: '6' }).some(x => x.startsWith('warn')), true);
+eq('wind', lv({ wind: '9' }).some(x => x.startsWith('warn')), true);
+eq('frac vis', M.parseVis('1 1/2 BR').sm, 1.5);
+eq('F conv', M.fToC('18'), 64.4); eq('F conv neg', M.fToC('-2'), 28.4);
+eq('aprRwy', [M.aprRwy('ILS OR LOC RWY 06R'), M.aprRwy('VOR-A'), M.aprRwy('RNAV (GPS) Y RWY 25L')], ['6R', null, '25L']);
+eq('hhmm wrap', M.hhmm(24 * 60 + 5), '0005'); eq('hplusmm', M.hplusmm(75.9), '01+15');
+eq('nm KTUS-KPHX', Math.round(M.nm([32.1171, -110.9415], [33.4343, -112.0116])), 96);
+console.log(`${n} unit checks, ${f} failures`); process.exit(f ? 1 : 0);

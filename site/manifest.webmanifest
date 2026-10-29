@@ -1,0 +1,16 @@
+{
+  "name": "IFR AMR Planner",
+  "short_name": "AMR Planner",
+  "description": "Instrument AMR / DD 175 / 175-1 planner with offline FAA airport data. Training and planning aid only.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14243b",
+  "theme_color": "#14243b",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
