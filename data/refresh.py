@@ -41,7 +41,7 @@ def urls(c):
     d = dt.date.fromisoformat(c['nasr']); tag = f"{d.day:02d}_{d.strftime('%b')}_{d.year}"
     return [f'https://nfdc.faa.gov/webContent/28DaySub/extra/{tag}_{k}_CSV.zip' for k in ('APT', 'FRQ', 'DP', 'AWOS')] + [f"https://aeronav.faa.gov/d-tpp/{c['tpp']}/xml_data/d-TPP_Metafile.xml"]
 
-SCHEMA = 3        # bump when build_data.py output changes shape; forces already-shipped cycles to be rebuilt
+SCHEMA = 4        # bump when build_data.py output changes shape; forces already-shipped cycles to be rebuilt
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--states'); ap.add_argument('--now'); ap.add_argument('--dry-run', action='store_true')

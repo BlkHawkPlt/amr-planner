@@ -17,7 +17,7 @@ for c in cycles:
 for a, b in zip(cycles, cycles[1:]): need(P(a['to']) == P(b['from']), f"cycles {a['tpp']} -> {b['tpp']} not contiguous")
 cur = [c for c in cycles if P(c['from']) <= now < P(c['to'])]
 need(len(cur) == 1, f"no manifest cycle is effective now ({now:%Y-%m-%d}); have {[c['tpp'] for c in cycles]}")
-st = json.load(open(f'{SITE}/data/static.json')); need(len(st['acft']) >= 5 and len(st['devices']) >= 5, 'static.json too small')
+st = json.load(open(f'{SITE}/data/static.json')); need([a['design'] for a in st['acft']] == ['UH-72', 'UH-60L', 'UH-60M'] and len(st['devices']) >= 20 and 'TH-67' not in json.dumps(st), 'static.json: aircraft must be UH-72 / UH-60L / UH-60M and tail numbers only')
 tot = 0
 for c in cycles:
     for s, ent in c['states'].items():

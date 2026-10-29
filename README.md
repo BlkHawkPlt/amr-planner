@@ -1,6 +1,6 @@
 # IFR AMR Planner
 
-Static, offline-capable web app (PWA) for planning instrument training missions: pick date / aircraft / device, departure +
+Static, offline-capable web app (PWA) for planning instrument training missions: pick date / aircraft (UH-72, UH-60L, UH-60M) / tail number, departure +
 destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, the **DD 1801** (DoD International Flight Plan - the flight plan everywhere in the app; ETE/ETD/ETA are the DD 1801 EET numbers) with **DD 1801-C**; the old **DD 175** is only a hidden legacy option (Info > Show legacy DD 175),
 **DD 175-1** and the **Grade Sheet ATC call scripts** (AWOS/ASOS aware, every fillable blank filled from the plan + FAA data). No backend, no accounts; inputs are saved in the browser
 (localStorage) and named missions can be saved/loaded. Arizona is loaded in v1; the data pipeline and loader are built to scale to all states.
@@ -15,6 +15,7 @@ destination 1 + destination 2, runway / approach / SID / STAR / weather per airp
       index.html, css/, js/, icons/, sw.js, manifest.webmanifest   (all paths are relative -> works under /amr-planner/)
       js/model.js              pure logic (formulas, wx validation, flight timing, DD 1801 / 175-1 / AMR; legacy DD 175) - testable in node
       js/scripts.js            Grade Sheet ATC scripts + AWOS/ASOS-vs-ATIS detection + facility lookup
+      js/ops.js                towered-vs-uncontrolled (M.ctlOf) and the departure / arrival hand-off facility by direction (M.handoff)
       js/dd1801.js             DD 1801 / 1801-C field values (workbook mapping)
       js/forms.js              fills the OFFICIAL DoD PDFs (site/forms/*.pdf) with pdf-lib; vendor/ = pdf-lib + pdf.js (MIT / Apache-2.0)
       forms/                   (repo root) prepare_forms.py + original/ = the official PDFs as downloaded; site/forms = browser-fillable blanks
@@ -25,10 +26,11 @@ destination 1 + destination 2, runway / approach / SID / STAR / weather per airp
     data/                      pipeline (not deployed)
       config.json              states to build ("AZ" or ["AZ","NM"] or "ALL"), service-worker preload list, airport filter
       refresh.py               checks the FAA for a new cycle; if found: fetch -> build -> merge into site/data
-      fetch_data.py / build_data.py / cifp.py / assemble_site.py / extract_static.py / make_icons.py
+      fetch_data.py / build_data.py / ops.py / cifp.py / assemble_site.py / extract_static.py / make_icons.py
+                               (ops.py adds per airport t = control tower / airspace class / clearance phones and h = approach-control + Center candidates)
                                (cifp.py reads the FAA CIFP for IAF / crossing altitude / missed-approach text; AWOS.csv gives AWOS/ASOS type + phone)
     tests/
-      ci.sh                    what CI runs: unit.js + unit_forms.js + form_fidelity.py + data_sanity.py + ci_ui.py (headless Chromium, iPhone + iPad)
+      ci.sh                    what CI runs: unit.js + unit_forms.js + unit_ops.js + form_fidelity.py + data_sanity.py + ci_ui.py (headless Chromium, iPhone + iPad)
       form_fidelity.py         proves the filled PDFs differ from the official blanks only inside the form's fields (max box offset 0.000 pt)
       compare_workbook.py, e2e.py, verify_data_vs_workbook.py, run_local_all.sh
                                local-only regression against the original Excel workbook (the workbook is NOT in this repo; set AMR_XLSM)
@@ -64,6 +66,20 @@ Releases replace each other by themselves: the deploy stamps the service-worker 
 the new worker fills its cache with `cache:'reload'` requests (GitHub Pages' 10-minute HTTP cache cannot leak old files in), deletes old caches and reloads open windows;
 the page also compares `version.json` with its own build on launch / when brought to the foreground and shows "Update available - tap to update".
 Info shows the version + commit, "Check for updates" and "Force refresh app files" (keeps your missions).
+
+## Towered vs uncontrolled, and the first call after departure (v1.3)
+**Control.** Each airport carries `t` (from NASR APT_BASE, ATC_BASE/ATC_SVC/ATC_RMK, CLS_ARSP, FRQ): an operating control tower (ATCT/TWR, hours, part-time flagged), the airspace class, and for
+uncontrolled fields the CTAF / UNICOM frequency and the clearance phone numbers NASR lists in the remarks (e.g. KMZJ: Tucson Approach 520-829-6121). The Plan shows it per airport with an override
+(Auto / Towered / Uncontrolled). *Part-time towers* are only flagged with their hours - the app cannot know the time of day, so set Uncontrolled yourself for a closed-tower sim.
+- **Towered departure:** ATIS -> clearance delivery -> ground -> tower -> departure (unchanged).
+- **Uncontrolled departure:** clearance method dropdown (Phone / GCO / Airborne pickup); no taxi or takeoff clearance - the scripts use CTAF advisory calls (taxi, departing + direction), then the pilot calls the facility. NASR has no GCO frequencies, so the GCO frequency is typed on the Plan (blank marker otherwise); the clearance phone can also be overridden.
+- **Uncontrolled arrival:** CTAF advisory position report / final / clear-of-runway calls replace the tower calls.
+- **AWOS / ASOS broadcast** (departure and destinations): "<Airport name> automated weather (AWOS) or automated surface observation (ASOS), <plan Zulu time>, wind .. at .., visibility .., sky condition .., temperature .., dewpoint .., altimeter .. (repeats)". No runway in use, no information letter.
+
+**How the hand-off facility is chosen** (`M.handoff`, shown on the Plan with the reason, overridable from a dropdown of candidates): 1) the approach/departure provider NASR lists for the airport;
+2) else a towered field's own approach control; 3) else the terminal approach control (a facility serving an airport within 15 nm) whose bearing from the airport is within 90 deg of the initial course to the next destination;
+4) else the responsible ARTCC (RCAG frequency inferred from the nearest RCAG-listed airport); 5) else the nearest terminal facility. Arrivals use the course toward where the flight came from. Between a terminal facility and a different terminal
+facility the script adds a Center step. Known limits: NASR names only one provider per airport (so P08 / Coolidge is Albuquerque Center in both directions), the Center frequency is inferred (not sector-exact), and part-time tower hours are text only.
 
 ## Run / test locally
     cd site && python3 -m http.server 8765        # http://localhost:8765/  (service worker needs localhost or https)

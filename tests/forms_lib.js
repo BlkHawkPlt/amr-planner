@@ -22,7 +22,7 @@ function opsFor(key, m, env) {
 }
 async function build(key, m, env, opt) { const ops = opsFor(key, m, env); return { ops, bytes: await AF.fill(PL, blank(key), ops, opt || {}) }; }
 function sampleMission(env) {
-  const m = M.defaultMission('2026-10-28'); m.date = '2026-10-29'; m.device = 'RED 2';
+  const m = M.defaultMission('2026-10-28'); m.date = '2026-10-29'; m.device = '78730';
   Object.assign(m.dep, { id: 'KRYN', rwy: '6L', apr: '', sid: 'ALMON ONE (OBSTACLE) (RNAV)', wx: 'AUTO' });
   Object.assign(m.d1, { id: 'KTUS', apr: 'ILS OR LOC RWY 12', rwy: '12' });
   Object.assign(m.d2, { id: 'KIWA', apr: 'RNAV (GPS) RWY 4', rwy: '4' });

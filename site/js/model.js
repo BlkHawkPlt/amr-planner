@@ -25,13 +25,14 @@
   M.defaultMission = function (today) {
     const t = new Date(today || Date.now()); t.setDate(t.getDate() + 1);       // workbook: =TODAY()+1
     return {
-      v: 1, name: '', date: isoDate(t), acft: 'UH-72', device: 'GOLD 2',
+      v: 1, name: '', date: isoDate(t), acft: 'UH-72', device: '78724',
       dep: { id: '02AZ', wind: '090', ws: '10', vis: '1 FG', ct: 'OVC', ceil: '002', temp: '18', dp: '17', altim: '29.92',
-             wx: 'AUTO', apr: '', rwy: '', sid: '', trans: '', cd: 'ATC', maint: '020', exp: '040', min: '10' },
+             wx: 'AUTO', apr: '', rwy: '', sid: '', trans: '', cd: 'ATC', maint: '020', exp: '040', min: '10',
+             ctl: 'AUTO', cdm: 'PHONE', cdPh: '', gcoF: '', ho: 'AUTO' },
       d1: { id: 'KTUS', wind: '120', ws: '10', vis: '1 HZ', ct: 'OVC', ceil: '006', temp: '18', dp: '17', altim: '29.94',
-            wx: 'AUTO', apr: '', rwy: '', star: '', tvis: '', tcl: '', ac: 'NON RNAV Pub Rte' },
+            wx: 'AUTO', apr: '', rwy: '', star: '', tvis: '', tcl: '', ac: 'NON RNAV Pub Rte', ctl: 'AUTO', ho: 'AUTO' },
       d2: { id: 'KRYN', wind: '150', ws: '10', vis: '2 -RA', ct: 'OVC', ceil: '006', temp: '18', dp: '18', altim: '29.93',
-            wx: 'AUTO', apr: '', rwy: '', star: '', tvis: '', tcl: '', ac: 'RNAV No TAA' },
+            wx: 'AUTO', apr: '', rwy: '', star: '', tvis: '', tcl: '', ac: 'RNAV No TAA', ctl: 'AUTO' },
       noAlt: false, alt2: { id: '', time: '' },
       amr: { purpose: 'pick-up', who: 'the Sergeant Major of the Army', nav1: 'Conventional Ground based', nav2: 'Space based',
              missionTxt: '', specialTxt: '', intent: 'Accomplish the mission safely, to standard, on time and IAW applicable regulations, while complying with special instructions.  Complete INST APART during mission.',
@@ -54,6 +55,28 @@
     };
   };
 
+  /* ---------- saved missions from older versions ---------- */
+  // v1.3: the aircraft list is UH-72 / UH-60L / UH-60M and devices are plain tail numbers (the colour names are gone)
+  const LEGACY_DEV = { 'RED 1': '78557', 'RED 2': '78730', 'RED 3': '78729', 'RED 4': '78728', 'RED 5': '78727', 'GREEN 1': '78732', 'GREEN 2': '78737', 'GREEN 3': '78738', 'GREEN 4': '78739', 'GREEN 5': '78740',
+    'GREEN 6': '78560', 'GREEN 7': '78570', 'BLUE 1': '78552', 'BLUE 2': '78553', 'BLUE 3': '78554', 'BLUE 4': '78555', 'BLUE 5': '78556', 'PURPLE 1': '78731', 'PURPLE 2': '78736', 'PURPLE 3': '78735',
+    'PURPLE 4': '78734', 'PURPLE 5': '78733', 'BLACK 1': '78720', 'BLACK 2': '78721', 'BLACK 3': '78719', 'BLACK 4': '78722', 'GOLD 1': '78723', 'GOLD 2': '78724', 'GOLD 3': '78725', 'GOLD 4': '78726' };
+  const TH67_TAILS = new Set(['78557', '78560', '78570', '78552', '78553', '78554', '78555', '78556']);
+  M.LEGACY_DEVICES = LEGACY_DEV; M.AIRCRAFT = ['UH-72', 'UH-60L', 'UH-60M'];
+  // returns the migrated mission and a list of human-readable notes about what was changed
+  M.migrate = function (o) {
+    o = o || {}; const notes = [];
+    if (o.f175 && !o.fp) o.fp = o.f175; delete o.f175;                       // v1.2: the DD 1801 is the flight plan
+    const ac = s(o.acft);
+    if (ac && !M.AIRCRAFT.includes(ac)) { const to = ac === 'UH-60A' ? 'UH-60L' : 'UH-72'; notes.push(ac + ' is no longer available - aircraft changed to ' + to); o.acft = to; }
+    const dv = s(o.device).trim().toUpperCase();
+    if (dv && LEGACY_DEV[dv] !== undefined) {
+      const tail = LEGACY_DEV[dv];
+      if (TH67_TAILS.has(tail)) { o.device = '78724'; notes.push('device ' + dv + ' (a TH-67) is gone - tail number set to 78724'); }
+      else { o.device = tail; notes.push('device ' + dv + ' is now tail number ' + tail); }
+    } else if (dv === 'BLANK' || dv === 'ANY') { o.device = ''; notes.push('device BLANK removed'); }
+    return { m: o, notes };
+  };
+
   /* ---------- small helpers ---------- */
   M.fToC = c => Math.round((num(c) * 1.8 + 32) * 100) / 100;
   M.rwyNum = r => /^\d+$/.test(s(r));
@@ -72,8 +95,10 @@
 
   /* ---------- derived values ---------- */
   M.serNum = (m, env) => {                                         // AMR!C14
-    if (!m.device) return '99-12345';
-    const d = env.device(m.device); return d ? 'R-' + d.n : '99-12345';
+    const dv = s(m.device).trim(); if (!dv) return '99-12345';
+    const d = env.device(dv); if (d) return 'R-' + d.n;
+    if (/^\d{2}-\d{5}$/.test(dv)) return dv;                 // a full Army serial number typed in (e.g. 87-24650)
+    return /^\d{5}$/.test(dv) ? 'R-' + dv : '99-12345';          // a 5-digit tail number
   };
   M.last5 = ser => s(ser).slice(-5);
   M.aname = (x, env) => { const a = env.ap(x.id); return a ? a.n : s(x.id); };

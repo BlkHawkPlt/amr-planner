@@ -5,7 +5,7 @@
   python3 fetch_data.py --nasr 2026-10-01 --tpp 2610 --from-local ./nasr   # reuse already-downloaded files
 
 NASR  = National Airspace System Resources 28-day subscription (public, free):
-        https://nfdc.faa.gov/webContent/28DaySub/extra/<DD>_<Mon>_<YYYY>_<APT|FRQ|DP|AWOS>_CSV.zip
+        https://nfdc.faa.gov/webContent/28DaySub/extra/<DD>_<Mon>_<YYYY>_<APT|FRQ|DP|AWOS|ATC|CLS_ARSP>_CSV.zip
 d-TPP = Digital Terminal Procedures metafile:
         https://aeronav.faa.gov/d-tpp/<cycle>/xml_data/d-TPP_Metafile.xml
 """
@@ -26,8 +26,9 @@ def main():
     out = os.path.join(a.raw, a.nasr); os.makedirs(out, exist_ok=True)
     d = datetime.date.fromisoformat(a.nasr)
     tag = f"{d.day:02d}_{d.strftime('%b')}_{d.year}"
-    for k in ("APT", "FRQ", "DP", "AWOS"):
-        names = {"APT": ["APT_BASE.csv", "APT_RWY_END.csv"], "FRQ": ["FRQ.csv"], "DP": ["DP_BASE.csv", "DP_RTE.csv"], "AWOS": ["AWOS.csv"]}[k]
+    for k in ("APT", "FRQ", "DP", "AWOS", "ATC", "CLS_ARSP"):
+        names = {"APT": ["APT_BASE.csv", "APT_RWY_END.csv", "APT_RMK.csv"], "FRQ": ["FRQ.csv"], "DP": ["DP_BASE.csv", "DP_RTE.csv"], "AWOS": ["AWOS.csv"],
+                 "ATC": ["ATC_BASE.csv", "ATC_SVC.csv", "ATC_RMK.csv", "ATC_ATIS.csv"], "CLS_ARSP": ["CLS_ARSP.csv"]}[k]
         if a.from_local:
             for n in names:
                 p = os.path.join(a.from_local, f"{k}_CSV", n)

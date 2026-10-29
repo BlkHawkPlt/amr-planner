@@ -6,6 +6,7 @@
 set -e; cd "$(dirname "$0")"
 node unit.js
 node unit_forms.js
+node unit_ops.js
 python3 form_fidelity.py
 python3 data_sanity.py
 (cd ../site && python3 -m http.server 8799 --bind 127.0.0.1 >/dev/null 2>&1 & echo $! > /tmp/amr_ci_srv.pid)

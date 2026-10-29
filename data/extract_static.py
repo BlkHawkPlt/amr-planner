@@ -33,5 +33,11 @@ eq = dict(nav=codes(5, 41), sur=codes(44, 61), pbn=codes(87, 111),
           navDefault=[str(w2.cell(r, 54).value).strip() for r in range(5, 42) if w2.cell(r, 55).value == 'XX'],
           surDefault=[str(w2.cell(r, 54).value).strip() for r in range(44, 62) if w2.cell(r, 55).value == 'XX'],
           pbnDefault=[str(w2.cell(r, 54).value).strip() for r in range(87, 112) if w2.cell(r, 55).value == 'XX'])
+# v1.3: only UH-72, UH-60L, UH-60M; devices are plain UH-72 tail numbers (no colour labels). The UH-60L row is the workbook's UH-60A row (no L row exists).
+import copy
+by = {a['design']: a for a in acft}; L = copy.deepcopy(by['UH-60A']); L['design'] = 'UH-60L'
+L['note'] = 'UH-60L: performance row copied from the workbook UH-60A row (no UH-60L row in the workbook) - verify against the -10'
+acft = [by['UH-72'], L, by['UH-60M']]
+dev = [dict(device=n, type='UH-72', n=n) for n in sorted({d['n'] for d in dev if d['type'] == 'UH-72'})]
 json.dump(dict(acft=acft, devices=dev, eq=eq), open(out, 'w'), indent=1)
 print(len(acft), 'aircraft,', len(dev), 'devices,', len(eq['nav']), 'nav codes')

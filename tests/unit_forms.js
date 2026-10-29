@@ -19,12 +19,12 @@ ok('no airport with AWOS data has a nonsense type', Object.values(env.data).filt
 
 // ---- scripts wording
 let m = mk(), c = M.calls(m, env), g = c.grade;
-ok('AWOS destination: one-minute weather, no "information" letter', /one-minute weather/.test(g.d2Wx) && !/Information/.test(g.d2Wx) && !/info letter/.test(g.d2Wx), g.d2Wx);
+ok('AWOS destination: automated broadcast, no "information" letter, no runway in use', /automated (weather|surface observation), /.test(M.plain(g.d2Wx)) && !/Information/.test(g.d2Wx) && !/info letter/.test(g.d2Wx) && !/Runway \u27E6|RWY|Landing and Departing/.test(g.d2Wx), g.d2Wx);
 ok('AWOS destination: no "have information ___" in approach info', !/information/i.test(M.plain(g.d2Info)) || /one-minute/.test(M.plain(g.d2Info)), g.d2Info);
-ok('AWOS phone number is used', /480-988-9428/.test(g.d2Wx));
+ok('AWOS phone number is shown with the script', /480-988-9428/.test(c.hdr.d2Wx), c.hdr.d2Wx);
 ok('ATIS airport keeps the info-letter blank', /\u27EAinfo letter\u27EB/.test(g.d1Wx), g.d1Wx);
 m.d1.wx = 'ASOS'; c = M.calls(m, env);
-ok('toggling KTUS to ASOS rewrites its script', /ASOS/.test(c.grade.d1Wx) && !/info letter/.test(c.grade.d1Wx), c.grade.d1Wx);
+ok('toggling KTUS to ASOS rewrites its script', /automated surface observation/.test(c.grade.d1Wx) && !/info letter/.test(c.grade.d1Wx), c.grade.d1Wx);
 
 
 // ---- void / NLT: both ETD + minutes (default 30), editable

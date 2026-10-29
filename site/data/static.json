@@ -1,20 +1,6 @@
 {
  "acft": [
   {
-   "design": "TH-67",
-   "mil": "B06",
-   "td": "G",
-   "gw": 3200,
-   "burn": 24,
-   "unit": "Gals",
-   "fob": 74.4,
-   "cr90": "68%",
-   "cr110": "72",
-   "cr120": "74%",
-   "hover": "75%",
-   "climb": "90%"
-  },
-  {
    "design": "UH-72",
    "mil": "EC45",
    "td": "G",
@@ -29,7 +15,7 @@
    "climb": "71%"
   },
   {
-   "design": "UH-60A",
+   "design": "UH-60L",
    "mil": "H60",
    "td": "G",
    "gw": 14500,
@@ -40,7 +26,8 @@
    "cr110": "57%",
    "cr120": "60%",
    "hover": "59%",
-   "climb": "75%"
+   "climb": "75%",
+   "note": "UH-60L: performance row copied from the workbook UH-60A row (no UH-60L row in the workbook) - verify against the -10"
   },
   {
    "design": "UH-60M",
@@ -55,222 +42,118 @@
    "cr120": "77%",
    "hover": "60%",
    "climb": "80%"
-  },
-  {
-   "design": "AH-64",
-   "mil": "H64",
-   "td": "L",
-   "gw": 24000,
-   "burn": 1200,
-   "unit": "Lbs",
-   "fob": 3720.0,
-   "cr90": "47",
-   "cr110": "56",
-   "cr120": "63",
-   "hover": "50",
-   "climb": "80"
-  },
-  {
-   "design": "CH-47",
-   "mil": "H47",
-   "td": "G",
-   "gw": 50000,
-   "burn": 2200,
-   "unit": "Lbs",
-   "fob": 6820.0,
-   "cr90": 36,
-   "cr110": 42,
-   "cr120": 45,
-   "hover": 49,
-   "climb": 59
   }
  ],
  "devices": [
   {
-   "device": "RED 1",
-   "type": "TH-67",
-   "n": "78557",
-   "pad": "R1"
-  },
-  {
-   "device": "RED 2",
+   "device": "78719",
    "type": "UH-72",
-   "n": "78730",
-   "pad": "R2"
+   "n": "78719"
   },
   {
-   "device": "RED 3",
+   "device": "78720",
    "type": "UH-72",
-   "n": "78729",
-   "pad": "R3"
+   "n": "78720"
   },
   {
-   "device": "RED 4",
+   "device": "78721",
    "type": "UH-72",
-   "n": "78728",
-   "pad": "R4"
+   "n": "78721"
   },
   {
-   "device": "RED 5",
+   "device": "78722",
    "type": "UH-72",
-   "n": "78727",
-   "pad": "R5"
+   "n": "78722"
   },
   {
-   "device": "GREEN 1",
+   "device": "78723",
    "type": "UH-72",
-   "n": "78732",
-   "pad": "G1"
+   "n": "78723"
   },
   {
-   "device": "GREEN 2",
+   "device": "78724",
    "type": "UH-72",
-   "n": "78737",
-   "pad": "G2"
+   "n": "78724"
   },
   {
-   "device": "GREEN 3",
+   "device": "78725",
    "type": "UH-72",
-   "n": "78738",
-   "pad": "G3"
+   "n": "78725"
   },
   {
-   "device": "GREEN 4",
+   "device": "78726",
    "type": "UH-72",
-   "n": "78739",
-   "pad": "G4"
+   "n": "78726"
   },
   {
-   "device": "GREEN 5",
+   "device": "78727",
    "type": "UH-72",
-   "n": "78740",
-   "pad": "G5"
+   "n": "78727"
   },
   {
-   "device": "GREEN 6",
-   "type": "TH-67",
-   "n": "78560",
-   "pad": "G6"
-  },
-  {
-   "device": "GREEN 7",
-   "type": "TH-67",
-   "n": "78570",
-   "pad": "G7"
-  },
-  {
-   "device": "BLUE 1",
-   "type": "TH-67",
-   "n": "78552",
-   "pad": "B1"
-  },
-  {
-   "device": "BLUE 2",
-   "type": "TH-67",
-   "n": "78553",
-   "pad": "B2"
-  },
-  {
-   "device": "BLUE 3",
-   "type": "TH-67",
-   "n": "78554",
-   "pad": "B3"
-  },
-  {
-   "device": "BLUE 4",
-   "type": "TH-67",
-   "n": "78555",
-   "pad": "B4"
-  },
-  {
-   "device": "BLUE 5",
-   "type": "TH-67",
-   "n": "78556",
-   "pad": "B5"
-  },
-  {
-   "device": "PURPLE 1",
+   "device": "78728",
    "type": "UH-72",
-   "n": "78731",
-   "pad": "P1"
+   "n": "78728"
   },
   {
-   "device": "PURPLE 2",
+   "device": "78729",
    "type": "UH-72",
-   "n": "78736",
-   "pad": "P2"
+   "n": "78729"
   },
   {
-   "device": "PURPLE 3",
+   "device": "78730",
    "type": "UH-72",
-   "n": "78735",
-   "pad": "P3"
+   "n": "78730"
   },
   {
-   "device": "PURPLE 4",
+   "device": "78731",
    "type": "UH-72",
-   "n": "78734",
-   "pad": "P4"
+   "n": "78731"
   },
   {
-   "device": "PURPLE 5",
+   "device": "78732",
    "type": "UH-72",
-   "n": "78733",
-   "pad": "P5"
+   "n": "78732"
   },
   {
-   "device": "BLACK 1",
+   "device": "78733",
    "type": "UH-72",
-   "n": "78720",
-   "pad": "BLK1"
+   "n": "78733"
   },
   {
-   "device": "BLACK 2",
+   "device": "78734",
    "type": "UH-72",
-   "n": "78721",
-   "pad": "BLK2"
+   "n": "78734"
   },
   {
-   "device": "BLACK 3",
+   "device": "78735",
    "type": "UH-72",
-   "n": "78719",
-   "pad": "BLK3"
+   "n": "78735"
   },
   {
-   "device": "BLACK 4",
+   "device": "78736",
    "type": "UH-72",
-   "n": "78722",
-   "pad": "BLK4"
+   "n": "78736"
   },
   {
-   "device": "GOLD 1",
+   "device": "78737",
    "type": "UH-72",
-   "n": "78723",
-   "pad": "GD1"
+   "n": "78737"
   },
   {
-   "device": "GOLD 2",
+   "device": "78738",
    "type": "UH-72",
-   "n": "78724",
-   "pad": "GD2"
+   "n": "78738"
   },
   {
-   "device": "GOLD 3",
+   "device": "78739",
    "type": "UH-72",
-   "n": "78725",
-   "pad": "GD3"
+   "n": "78739"
   },
   {
-   "device": "GOLD 4",
+   "device": "78740",
    "type": "UH-72",
-   "n": "78726",
-   "pad": "GD4"
-  },
-  {
-   "device": "BLANK",
-   "type": "ANY",
-   "n": "12345",
-   "pad": "BLANK"
+   "n": "78740"
   }
  ],
  "eq": {

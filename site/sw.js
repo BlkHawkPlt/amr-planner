@@ -3,8 +3,8 @@
  *   2. the new cache is filled with cache:'reload' requests (GitHub Pages sends max-age=600, so a plain fetch could copy STALE files from the browser's HTTP cache into the new cache);
  *   3. when a new worker takes over from an older release it reloads every open window, so an app left open (or installed on the home screen) switches to the new version by itself.
  * version.json is never cached: the page compares it with its own build to show "Update available". States with "pre": false in data/manifest.json are cached only when first opened. */
-const CACHE = 'amr-planner-v1.2.0';
-const SHELL = ['./', 'index.html', 'css/app.css', 'js/version.js', 'js/model.js', 'js/scripts.js', 'js/dd1801.js', 'js/forms.js', 'js/data.js', 'js/app.js',
+const CACHE = 'amr-planner-v1.3.0';
+const SHELL = ['./', 'index.html', 'css/app.css', 'js/version.js', 'js/model.js', 'js/ops.js', 'js/scripts.js', 'js/dd1801.js', 'js/forms.js', 'js/data.js', 'js/app.js',
   'vendor/pdf-lib.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'forms/fields.json', 'forms/dd1801.pdf', 'forms/dd1801c.pdf', 'forms/dd175.pdf', 'forms/dd175-1.pdf',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.png', 'data/manifest.json', 'data/static.json'];
 const fresh = u => new Request(u, { cache: 'reload' });

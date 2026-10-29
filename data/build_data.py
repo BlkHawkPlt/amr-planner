@@ -234,6 +234,9 @@ def main():
             if w.get('f') is None and i in G and False: pass
             A[i]['w'] = w
 
+    if os.path.exists(f'{raw}/ATC_BASE.csv') and os.path.exists(f'{raw}/CLS_ARSP.csv'):      # tower / airspace class / clearance phones / handoff candidates
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import ops as OPS
+        OPS.attach(A, ID, raw, base); print('ops: control / airspace / handoff data attached')
     if a.cifp and os.path.exists(a.cifp):
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cifp as C
         na, nm, nt = C.attach(A, C.parse(a.cifp)); print(f'CIFP: procedure details for {nm} of {nt} approaches at {na} airports')

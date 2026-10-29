@@ -20,14 +20,16 @@ def mk(**kw):
                 else: m[k][kk] = vv
         else: m[k] = v
     return m
+# the workbook still keys devices by colour name; the app uses tail numbers
+WB_DEV = {'78724': 'GOLD 2', '78730': 'RED 2'}
 SC = {}
-SC['S1_KTUS_KRYN_KDMA'] = mk(acft='UH-72', device='GOLD 2',
+SC['S1_KTUS_KRYN_KDMA'] = mk(acft='UH-72', device='78724',
     dep=dict(id='KTUS', wind='090', ws='10', vis='1 FG', ct='OVC', ceil='002', temp='18', dp='17', altim='29.92', wx='ATIS', apr='RNAV (GPS) RWY 04', rwy='4', sid='TUCSON NINE', trans='MESCA', cd='ATC', maint='060', exp='100', min='10'),
     d1=dict(id='KRYN', wind='120', ws='8', vis='1/2 FG', ct='BKN', ceil='004', temp='12', dp='11', altim='29.87', wx='ASOS', apr='ILS OR LOC RWY 06R', rwy='6R', tvis='1/4 FG', tcl='VV 001', ac='RNAV within TAA'),
     d2=dict(id='KDMA', wind='310', ws='14', vis='2 -RA', ct='OVC', ceil='006', temp='20', dp='19', altim='29.93', wx='AWOS', apr='TACAN Y RWY 13', rwy='13', ac='Vector Non RNAV'),
     fp=dict(etd='1930', tas='110', alt1='040', alt2='060', hold='10', v1='18', x1='10', w1='0', v2='45', x2='12', w2='2', v3='30', x3='8', w3='4', fob='3+00'),
     f1751=dict(briefTime='1900', init='EO'), amr=dict(unit='TEST UNIT / KXXX', wb='KXXX / 01 JAN 26'))
-SC['S2_02AZ_KPHX_KFLG'] = mk(acft='UH-60M', device='BLUE 3',
+SC['S2_02AZ_KPHX_KFLG'] = mk(acft='UH-60M', device='78730',
     dep=dict(id='02AZ', wind='VRB', ws='5', vis='3 BR', ct='BKN', ceil='015', temp='25', dp='15', altim='30.12', wx='AWOS', apr='', rwy='H1', sid='', trans='', cd='RELAY', maint='040', exp='', min='10'),
     d1=dict(id='KPHX', wind='250', ws='12', vis='2 HZ', ct='OVC', ceil='008', temp='30', dp='20', altim='29.81', wx='ATIS', apr='ILS OR LOC RWY 25L', rwy='25L', star='EAGUL SIX (RNAV)', tvis='', tcl='', ac='NON RNAV Pub Rte'),
     d2=dict(id='KFLG', wind='200', ws='20', vis='1 SN', ct='VV', ceil='001', temp='-2', dp='-3', altim='30.05', wx='ATIS', apr='RNAV (GPS) RWY 21', rwy='21', ac='RNAV No TAA', tvis='1/2 FZFG', tcl='VV 000'),
@@ -74,7 +76,7 @@ def cells_for(m):
     put('A4', D['id']); put('A6', D['wind']); put('B6', numish(D['ws'])); put('A8', D['vis']); put('C8', D['apr']); put('A10', D['ct']); put('B10', D['ceil'])
     put('C10', numish(D['rwy'])); put('C12', D['sid']); put('C14', D['trans']); put('A12', numish(D['temp'])); put('B12', numish(D['dp'])); put('A14', float(D['altim']))
     put('E3', D['wx']); put('E6', D['cd']); put('A17', D['maint']); put('B17', D['exp']); put('C17', numish(D['min']))
-    put('E10', m['device']); put('E15', m['acft'])
+    put('E10', WB_DEV.get(m['device'], m['device'])); put('E15', m['acft'])
     for k, (base, wxr, acr) in {'d1': (20, 'E19', 'E22'), 'd2': (34, 'E33', 'E36')}.items():
         x = m[k]; o = base
         put(f'A{o}', x['id']); put(f'A{o+2}', x['wind']); put(f'B{o+2}', x['ws']); put(f'A{o+4}', x['vis']); put(f'C{o+2}', x['apr']); put(f'A{o+6}', x['ct']); put(f'B{o+6}', x['ceil'])
@@ -132,6 +134,7 @@ def explain(name, key, w, a, m):
     etd = m['fp']['etd']
     if key == 'D175.K13': return 'CHAR(174) (registered-mark) is encoded differently by LibreOffice; same glyph in Excel'
     if key == 'Grade.N39': return 'workbook typo "Farhenheit" corrected'
+    if key == 'Grade.N40': return 'workbook prints the colour device name; the app prints the tail number (v1.3 removed colour labels)'
     if key == 'I1751.Q4' and w == a.rstrip('Z'): return 'app appends the Z shown in the form'
     if key in ('I1751.Q4', 'AMR.A4') and '1930' in str(w) and etd != '1930' and str(w).replace('1930', etd) == str(a).replace('1930', etd) or (key in ('I1751.Q4',) and str(w).replace('1930', etd) + 'Z' == a): return 'workbook hard-codes ETD 1930; app uses the plan ETD'
     if key.startswith('I1751.A') and w == 'DEST/ALTN' and a == '': return 'workbook labels unused forecast rows DEST/ALTN; app leaves unused rows empty'

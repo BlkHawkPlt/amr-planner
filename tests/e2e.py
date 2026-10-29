@@ -58,10 +58,11 @@ def run(name, vp):
         for k, fld, key in (('dep', 'rwy', 'r'), ('dep', 'apr', 'i'), ('dep', 'sid', 'd'), ('d1', 'rwy', 'r'), ('d1', 'apr', 'i'), ('d1', 'star', 's'), ('d2', 'rwy', 'r'), ('d2', 'apr', 'i'), ('d2', 'star', 's')):
             check(f'[{name}] list {k}.{fld}', opts(f'{k}.{fld}'), AZ[SC[k]['id']].get(key, []))
         # 3) fill everything else from the scenario
+        pg.select_option('[data-b="dep.ctl"]', 'TWR')       # the workbook only knows the towered flow (clearance type select is hidden at an uncontrolled field)
         for path, v in flat(SC):
             if path in ('dep.id', 'd1.id', 'd2.id') or path.startswith('amr.pax') and False: continue
             loc = pg.locator(f'[data-b="{path}"]')
-            if loc.count() == 0 or v is None: continue
+            if loc.count() == 0 or v is None or not loc.first.is_visible(): continue      # (uncontrolled-only inputs are hidden at a towered field)
             tag = loc.first.evaluate('e=>e.tagName+":"+(e.type||"")')
             if tag.startswith('SELECT'): loc.first.select_option(value=str(v))
             elif tag.endswith('checkbox'): loc.first.set_checked(bool(v))
@@ -118,7 +119,7 @@ def run(name, vp):
         def facts(txt): return set(re.findall(r'\b(?:\d{3}\.\d{1,2}|\d{2,5})\b', txt))
         for lab, pref, ref in (('departure WX', 'Departure weather', 'A2'), ('dest1 WX', 'Destination 1 weather', 'A23'), ('dest2 WX', 'Destination 2 weather', 'M15')):
             wx_nums = {t for t in facts(w('Grade Sheet', ref)) if len(t) == 3 or '.' in t}      # wind dir, ceiling, altimeter
-            check(f'[{name}] script {lab} carries the workbook weather numbers', wx_nums <= (facts(find(pref)) | {t.lstrip('0') for t in facts(find(pref))}), True)
+            check(f'[{name}] script {lab} carries the workbook weather numbers', wx_nums <= (facts(find(pref)) | {t.lstrip('0') for t in facts(find(pref))} | {str(int(t) * 100) for t in facts(find(pref)) if t.isdigit() and len(t) == 3} | {t.zfill(3) for t in facts(find(pref))} | {str(int(x) // 100).zfill(3) for x in facts(find(pref)) if x.isdigit() and len(x) in (3, 4, 5) and int(x) % 100 == 0}), True)       # v1.3 AWOS/ASOS broadcast says the ceiling in feet (overcast 600 = 006)
         check(f'[{name}] scripts use the call sign', all(re.search(r'\b\d{5}\b', find(p)) for p in ('Clearance delivery', 'Taxi', 'Takeoff', 'Departure control', 'Clearance to 2nd destination')), True)
         check(f'[{name}] destination clearances name the approaches', S['d1']['apr'] in find('Approach clearance') and S['d2']['apr'] in find('Destination 2 approach clearance'), True)
         check(f'[{name}] script blanks only where ATC assigns', not re.search(r'void|NLT', pg.inner_text('#view-scripts .bk') if pg.locator('#view-scripts .bk').count() else ''), True)

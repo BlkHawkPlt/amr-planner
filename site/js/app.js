@@ -18,7 +18,8 @@
     return over === undefined ? base : over;
   }
   // older saves called the flight-plan inputs 'f175' (the DD 175 was the flight plan); the DD 1801 is now the flight plan
-  function migrate(o) { o = o || {}; if (o.f175 && !o.fp) o.fp = o.f175; delete o.f175; return o; }
+  // v1.3 also drops TH-67 / colour device names (M.migrate); notes are shown once as a toast
+  function migrate(o) { const r = M.migrate(o); if (r.notes.length) setTimeout(() => toast('Updated saved mission: ' + r.notes.join('; ')), 400); return r.m; }
   let saveT = null;
   function save() { clearTimeout(saveT); saveT = setTimeout(() => jset(LS.cur, S.m), 150); }
   function getp(path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), S.m); }
@@ -38,7 +39,7 @@
   function airportCard(k) {
     const dep = k === 'dep';
     const wx = `
-      <h3>Weather</h3><div class="grid g4">
+      <h3>Weather</h3><div class="grid"><div class="f full wxsrc">${'<label>Weather source (ATIS / AWOS / ASOS)</label>'}${sel(k + '.wx', M.WX_CHOICES)}<span class="hint" id="wxh-${k}"></span></div></div><div class="grid g4">
       ${F('Wind dir', inp(k + '.wind', { attrs: 'inputmode="numeric" maxlength="3"', ph: '090' }))}
       ${F('Speed (kt)', inp(k + '.ws', { attrs: 'inputmode="numeric" maxlength="6"', ph: '10' }))}
       ${F('Visibility + reason', inp(k + '.vis', { ph: '1 FG' }), 'span2')}
@@ -49,22 +50,27 @@
       ${F('Altimeter', inp(k + '.altim', { attrs: 'inputmode="decimal" maxlength="5"', ph: '29.92' }))}
       </div><div class="msgs" id="msg-${k}"></div>`;
     const ops = `<h3>Procedures</h3><div class="grid g2">
-      ${F('Weather source', sel(k + '.wx', M.WX_CHOICES), 'full', `<span class="hint" id="wxh-${k}"></span>`)}
       ${F('Approach in use', `<select data-b="${k}.apr" data-dyn="apr"></select>`)}
       ${F('Runway in use', `<select data-b="${k}.rwy" data-dyn="rwy"></select>`)}
       ${dep ? F('SID / DP (if required)', `<select data-b="dep.sid" data-dyn="sid"></select>`) : F('STAR (if used)', `<select data-b="${k}.star" data-dyn="star"></select>`)}
       ${dep ? F('Transition', `<input data-b="dep.trans" value="${esc(S.m.dep.trans)}" list="dl-trans" placeholder="type or pick" autocomplete="off"><datalist id="dl-trans"></datalist>`) : F('TEMPO visibility', inp(k + '.tvis', { ph: '1/2 FG' }))}
       ${dep ? '' : F('TEMPO cloud layer', inp(k + '.tcl', { ph: 'BKN 003' }))}
       </div>`;
+    const ctlSec = `<h3>Control &amp; hand-off</h3><div class="grid g2">
+      ${F('Tower / uncontrolled', sel(k + '.ctl', M.CTL_CHOICES), 'full', `<span class="hint" id="ctl-${k}"></span>`)}
+      ${dep ? F('Clearance method (uncontrolled field)', sel('dep.cdm', M.CDM_LIST), 'full cdu', '<span class="hint">No taxi / takeoff clearance at an uncontrolled field - only CTAF advisory calls.</span>')
+        + F('Clearance phone (blank = FAA data)', inp('dep.cdPh', { attrs: 'inputmode="tel"', ph: 'phone number' }), 'cdu')
+        + F('GCO frequency (not in FAA data)', inp('dep.gcoF', { attrs: 'inputmode="decimal"', ph: '123.45' }), 'cdu') : ''}
+      ${k === 'd2' ? '' : F(dep ? 'First contact after departure' : 'First contact after leaving this airport', `<select data-b="${k}.ho" data-dyn="ho"></select>`, 'full', `<span class="hint" id="hoh-${k}"></span>`)}</div>`;
     const clr = dep ? `<h3>Clearance &amp; climb-out</h3><div class="grid g2">
-      ${F('Clearance type', sel('dep.cd', M.CD_LIST))}
+      ${F('Clearance type (towered field)', sel('dep.cd', M.CD_LIST), 'cdt')}
       ${F('Maintain (alt)', inp('dep.maint', { attrs: 'inputmode="numeric"', ph: '020' }))}
       ${F('Expect (alt)', inp('dep.exp', { attrs: 'inputmode="numeric"', ph: '040' }))}
       ${F('Min after dep', inp('dep.min', { attrs: 'inputmode="numeric"', ph: '10' }))}</div>`
       : `<h3>Approach clearance</h3><div class="grid">${F('Clearance type', sel(k + '.ac', M.CLR_TYPES.map(x => [x, x.replace(/\s+/g, ' ')])), 'full')}</div>`;
     return `<section class="card" data-ap="${k}"><h2>${APN[k]}<small id="cnt-${k}"></small></h2>
       <div class="grid"><div class="f full"><label>Airport (ID, name or city)</label><input data-b="${k}.id" data-pick="${k}" value="${esc(S.m[k].id)}" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="e.g. KTUS, RYN, Tucson"><ul class="sug" hidden></ul></div></div>
-      <div class="apinfo" id="info-${k}"></div>${wx}${ops}${clr}</section>`;
+      <div class="apinfo" id="info-${k}"></div>${wx}${ops}${ctlSec}${clr}</section>`;
   }
   function planHTML() {
     const dev = D.static.devices, ac = D.static.acft;
@@ -72,7 +78,7 @@
     <section class="card"><h2>Mission</h2><div class="grid g2">
       ${F('Date', `<input type="date" data-b="date" value="${esc(S.m.date)}">`)}
       ${F('Aircraft type', sel('acft', ac.map(a => [a.design, `${a.design} (${a.mil})`])))}
-      ${F('Device / aircraft', `<select data-b="device">${optList(dev.map(d => [d.device, `${d.device} - ${d.type} ${d.n}`]), S.m.device)}</select>`, 'span2', '<span class="hint" id="serialHint"></span>')}
+      ${F('Tail number (aircraft / device)', `<input data-b="device" value="${esc(S.m.device)}" list="dl-dev" inputmode="numeric" autocomplete="off" placeholder="e.g. 78724"><datalist id="dl-dev">${dev.map(d => `<option value="${esc(d.device)}">${esc(d.type)}</option>`).join('')}</datalist>`, 'span2', '<span class="hint" id="serialHint"></span>')}
       ${F('Mission name (for saving)', inp('name', { ph: 'e.g. Wed IFR sim #3' }), 'span2')}
     </div></section>
     ${airportCard('dep')}${airportCard('d1')}${airportCard('d2')}
@@ -161,6 +167,25 @@
       for (const f in map) if (map[f].test(m.msg)) { const el = $(`[data-b="${k}.${f}"]`); el && el.classList.add('bad'); }
     });
   }
+  // tower / uncontrolled line, clearance-method visibility and the hand-off dropdowns (all driven by the Plan)
+  function renderCtl(rebuildHo) {
+    ['dep', 'd1', 'd2'].forEach(k => {
+      const x = S.m[k], a = D.ap(x.id), c = M.ctlOf(x, a), el = $('#ctl-' + k); if (el) el.textContent = c.text;
+      if (k === 'dep') {
+        $$('.cdu').forEach(e => { e.hidden = c.towered; }); $$('.cdt').forEach(e => { e.hidden = !c.towered; });
+        const ph = $('[data-b="dep.cdPh"]'), g = $('[data-b="dep.gcoF"]'), e0 = (c.cd.find(e => !e.u) || c.cd[0]);
+        if (ph) ph.placeholder = e0 ? e0.ph + ' (' + e0.fac + ')' : 'none in FAA data - type one'; if (g) g.placeholder = c.gco ? c.gco.f : 'none in FAA data - type one';
+      }
+      if (k !== 'd2') {
+        const h = M.handoff(S.m, k, env, 'dep'), sel2 = $(`[data-b="${k}.ho"]`), hh = $('#hoh-' + k); if (!sel2) return;
+        if (S.m[k].ho && S.m[k].ho !== 'AUTO' && !h.cands.some(q => q.id === S.m[k].ho)) S.m[k].ho = 'AUTO';
+        const cur = S.m[k].ho || 'AUTO', auto = M.handoff(Object.assign({}, S.m, { [k]: Object.assign({}, S.m[k], { ho: 'AUTO' }) }), k, env, 'dep').fac;
+        const list = [['AUTO', 'Auto: ' + (auto ? M.facLabel(auto) : 'none found')]].concat(h.cands.map(q => [q.id, M.facLabel(q) + (q.d != null ? ' (' + q.d + ' nm, brg ' + q.b + '\u00B0)' : '')]));
+        if (rebuildHo !== false) sel2.innerHTML = optList(list, cur);
+        if (hh) hh.textContent = (h.fac ? M.facLabel(h.fac) + ' - ' : '') + h.why + (h.towered ? '' : ' (uncontrolled field - you make this first call)');
+      }
+    });
+  }
   function renderAlt() {
     const adv = M.altAdvice(S.m, env), el = $('#altMsg'); if (!el) return;
     const one = (lbl, r) => `<div class="msg ${r.ok ? 'ok' : 'warn'}">${lbl}: ${r.ok ? 'forecast at/above 2000-3 - alternate likely not required' : 'below 2000-3 (' + r.why.join(', ') + ') - alternate required'}</div>`;
@@ -168,7 +193,8 @@
   }
   function renderSerial() {
     const el = $('#serialHint'); if (!el) return; const ser = M.serNum(S.m, env), d = D.device(S.m.device);
-    el.textContent = `Serial / N-number: ${ser}${d ? ' • pad ' + d.pad : ''}${d && S.m.acft && d.type !== 'ANY' && d.type !== S.m.acft ? ' • (device normally ' + d.type + ')' : ''}`;
+    const ac = D.acft(S.m.acft);
+    el.textContent = `Serial / N-number: ${ser}${d && S.m.acft && d.type !== S.m.acft ? ' • (this tail is normally a ' + d.type + ')' : ''}${ac && ac.note ? ' • ' + ac.note : ''}`;
   }
   function renderGC() {
     const p = x => { const a = D.ap(x.id); return a && a.p; };
@@ -182,7 +208,7 @@
   function refreshPlan(only) {
     const ks = only ? [only] : ['dep', 'd1', 'd2'];
     ks.forEach(k => { fillDyn(k); renderInfo(k); renderMsgs(k); });
-    renderAlt(); renderSerial(); renderGC(); renderTiming();
+    renderCtl(); renderAlt(); renderSerial(); renderGC(); renderTiming();
   }
 
   /* ---------- picker ---------- */
@@ -230,12 +256,13 @@
       if (fld === 'sid') { fillDyn(k); }
       renderMsgs(k);
     }
-    if (path === 'device') { const d = D.device(v); if (d && d.type !== 'ANY' && D.acft(d.type)) { S.m.acft = d.type; const ae = $('[data-b="acft"]'); if (ae) ae.value = d.type; } renderSerial(); }
+    if (path === 'device') { const d = D.device(v.trim()); if (d && D.acft(d.type)) { S.m.acft = d.type; const ae = $('[data-b="acft"]'); if (ae) ae.value = d.type; } renderSerial(); }
     if (path === 'acft') renderSerial();
     if (/^(d1|d2)\./.test(path) || path === 'noAlt') renderAlt();
     if (path === 'name') $('#missionLabel').textContent = v || 'New mission';
     if (/^(fp|scriptOpts)\./.test(path)) renderTiming();
     if (/^(dep|d1|d2)\.wx$/.test(path)) renderInfo(k);
+    if (/^(dep|d1|d2)\.(ctl|cdm|cdPh|gcoF|ho)$/.test(path)) renderCtl(!/\.ho$/.test(path));
     if (S.tab !== 'plan') S.dirtyPlan = true;
     if (S.tab === 'fp' || S.tab === '1751') schedPdf();
   }
@@ -400,12 +427,12 @@
   /* ---------- OUTPUT: Scripts (Grade Sheet) ---------- */
   const mark = t => esc(t).replace(/\u27E6/g, '<span class="fv">').replace(/\u27E7/g, '</span>').replace(/\u27EA/g, '<span class="bk">[').replace(/\u27EB/g, ']</span>');
   function viewScripts() {
-    const c = M.calls(S.m, env), g = c.grade, m = S.m, h = c.hdr;
+    const c = M.calls(S.m, env), g = c.grade, m = S.m, h = c.hdr, T = c.title || {};
     const sc = (title, key, hk) => g[key] === '' || g[key] == null ? '' : `<div class="script"><h3>${esc(title)}<button class="btn sm" data-copy="${esc(M.plain(g[key]))}">Copy</button></h3>${h[hk || key] ? `<div class="facl">${esc(h[hk || key])}</div>` : ''}<p>${mark(g[key])}</p></div>`;
     const left = [...new Set(Object.values(g).flatMap(t => M.blanks(t)))];
     const row = k => {          // read-only: the Plan tab is the single source of truth, nothing here can diverge from it
-      const x = m[k], w = c.src[k];
-      return `<div class="sctl"><b>${esc(APN[k])} ${esc(x.id)}</b><div class="kv" style="grid-column:1/-1"><b>Weather</b><span>${esc((w.auto ? 'Auto → ' : '') + w.label)}${w.freq && w.freq.txt ? ' • ' + esc(w.freq.txt) : ''}${w.phone ? ' • ph ' + esc(w.phone) : ''}</span>
+      const x = m[k], w = c.src[k], cl = c.ctl[k], hf = c.ho[k];
+      return `<div class="sctl"><b>${esc(APN[k])} ${esc(x.id)}</b><div class="kv" style="grid-column:1/-1"><b>Control</b><span>${cl.towered ? 'Towered' : 'Uncontrolled (CTAF ' + esc(cl.adv.txt || '122.9') + ')'}${k === 'dep' && !cl.towered ? ' • clearance by ' + esc({ PHONE: 'phone', GCO: 'GCO', AIR: 'airborne pickup' }[c.ctl.cdMode] || '') : ''}</span>${hf ? `<b>First contact</b><span>${hf.fac ? esc(hf.fac.name) + (hf.fac.f && hf.fac.f.txt ? ' ' + esc(hf.fac.f.txt) : '') : '—'}</span>` : ''}<b>Weather</b><span>${esc((w.auto ? 'Auto → ' : '') + w.label)}${w.freq && w.freq.txt ? ' • ' + esc(w.freq.txt) : ''}${w.phone ? ' • ph ' + esc(w.phone) : ''}</span>
         <b>Approach</b><span>${esc(x.apr || '—')}</span><b>Runway</b><span>${esc(x.rwy || '—')}</span><b>${k === 'dep' ? 'SID / transition' : 'STAR'}</b><span>${esc(k === 'dep' ? ((x.sid || '—') + (x.trans ? ' / ' + x.trans : '')) : (x.star || '—'))}</span></div></div>`;
     };
     return `<div class="outbar"><button class="btn pri" data-act="print">Print / Save PDF</button><button class="btn" data-act="goplan">Edit inputs</button></div>
@@ -414,14 +441,14 @@
       <div class="script"><h3>Grade sheet setup</h3><p>${esc(g.cockpit)}   •   ${esc(g.simTemp)}   •   Date ${esc(fmtDate(m.date))}</p></div>
       <div class="s2"><div>
       <h3 style="margin:4px 0">DEPARTURE - ${esc(m.dep.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.dep.tip)}</div>
-      ${sc('Departure weather (' + c.src.dep.label + ')', 'depWx')}${sc('Clearance delivery (' + m.dep.cd + ')', 'cd')}${sc('Taxi', 'taxi')}${sc('Takeoff', 'takeoff')}${sc('Handoff', 'handoff1')}${sc('Departure control', 'depCtl')}${sc('Handoff', 'contact')}${sc('Handoff to Center', 'toApp1')}
+      ${sc('Departure weather (' + c.src.dep.label + ')', 'depWx')}${sc(T.cd || 'Clearance', 'cd')}${sc(T.taxi || 'Taxi', 'taxi')}${sc(T.takeoff || 'Takeoff', 'takeoff')}${sc(T.handoff1 || 'Handoff', 'handoff1')}${sc('Departure control', 'depCtl')}${sc('Handoff', 'contact')}${sc('Handoff to Center', 'toApp1')}
       <h3 style="margin:4px 0">DESTINATION 1 - ${esc(m.d1.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.d1.tip)}</div>
-      ${sc('Destination 1 weather (' + c.src.d1.label + ')', 'd1Wx')}${sc('Approach information', 'd1Info')}${sc('Approach clearance (' + m.d1.ac.replace(/\s+/g, ' ') + ')', 'd1Clr')}${sc('Alternate phrasing - cross fix', 'd1Cross')}${sc('Cancel IFR', 'd1Cancel')}${sc('Tower (or)', 'd1Tower')}
+      ${sc('Destination 1 weather (' + c.src.d1.label + ')', 'd1Wx')}${sc('Approach information', 'd1Info')}${sc('Approach clearance (' + m.d1.ac.replace(/\s+/g, ' ') + ')', 'd1Clr')}${sc('Alternate phrasing - cross fix', 'd1Cross')}${sc('Cancel IFR', 'd1Cancel')}${sc('Tower (or)', 'd1Tower')}${sc(T.d1Ctaf1, 'd1Ctaf1')}${sc(T.d1Ctaf2, 'd1Ctaf2')}${sc(T.d1Ctaf3, 'd1Ctaf3')}
       </div><div>
       <h3 style="margin:4px 0">MISSED APPROACH</h3>
       ${sc('Missed approach - handoff', 'missed1')}${sc('Approach control', 'missed2')}${sc('Hold / expect further clearance', 'missed3')}${sc('Published missed approach (from the procedure)', 'missedPub', 'missed3')}
       <h3 style="margin:4px 0">CLEARANCE TO DESTINATION 2 - ${esc(m.d2.id)}</h3><div class="fx" style="margin:0 0 6px">${esc(c.src.d2.tip)}</div>
-      ${sc('Clearance to 2nd destination', 'toD2')}${sc('Handoff', 'handoff2')}${sc('Handoff to Center', 'toApp2')}${sc('Destination 2 weather (' + c.src.d2.label + ')', 'd2Wx')}${sc('Destination 2 approach information', 'd2Info')}${sc('Destination 2 approach clearance (' + m.d2.ac.replace(/\s+/g, ' ') + ')', 'd2Clr')}${sc('Alternate phrasing - cross fix', 'd2Cross')}${sc('Cancel IFR', 'd2Cancel')}${sc('Contact tower', 'd2ContactTwr')}${sc('Destination 2 tower', 'd2Tower')}
+      ${sc('Clearance to 2nd destination', 'toD2')}${sc('Handoff', 'handoff2')}${sc('Handoff to Center', 'toApp2')}${sc('Destination 2 weather (' + c.src.d2.label + ')', 'd2Wx')}${sc('Destination 2 approach information', 'd2Info')}${sc('Destination 2 approach clearance (' + m.d2.ac.replace(/\s+/g, ' ') + ')', 'd2Clr')}${sc('Alternate phrasing - cross fix', 'd2Cross')}${sc('Cancel IFR', 'd2Cancel')}${sc(c.ctl.d2.towered ? 'Contact tower' : 'Advisory frequency approved', 'd2ContactTwr')}${sc('Destination 2 tower', 'd2Tower')}${sc(T.d2Ctaf1, 'd2Ctaf1')}${sc(T.d2Ctaf2, 'd2Ctaf2')}${sc(T.d2Ctaf3, 'd2Ctaf3')}
       </div></div>${footer()}`;
   }
 

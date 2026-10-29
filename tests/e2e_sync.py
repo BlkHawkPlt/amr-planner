@@ -51,7 +51,7 @@ def run(pg):
 
 MARK = 'ZQMARK'
 # new value for each Plan input (valid for its field); AIRPORTS are picked through the autocomplete. A value starting with '#' = pick option index.
-VAL = {'date': '2026-11-03', 'acft': 'UH-60M', 'device': '#2', 'dep.wind': '270', 'dep.ws': '12', 'dep.vis': '3 HZ', 'dep.ct': 'BKN', 'dep.ceil': '045',
+VAL = {'date': '2026-11-03', 'acft': 'UH-60M', 'device': '78735', 'dep.wind': '270', 'dep.ws': '12', 'dep.vis': '3 HZ', 'dep.ct': 'BKN', 'dep.ceil': '045',
        'dep.temp': '31', 'dep.dp': '09', 'dep.altim': '30.11', 'dep.wx': 'ATIS', 'dep.apr': '#2', 'dep.rwy': '#2', 'dep.sid': '#2', 'dep.trans': MARK, 'dep.cd': 'RELAY',
        'dep.maint': '035', 'dep.exp': '055', 'dep.min': '25',
        'd1.wind': '330', 'd1.ws': '14', 'd1.vis': '4 BR', 'd1.ct': 'BKN', 'd1.ceil': '032', 'd1.temp': '27', 'd1.dp': '11', 'd1.altim': '30.05', 'd1.wx': 'AWOS',
@@ -62,8 +62,10 @@ VAL = {'date': '2026-11-03', 'acft': 'UH-60M', 'device': '#2', 'dep.wind': '270'
        'fp.etd': '2045', 'fp.tas': '95', 'fp.rules': 'V', 'fp.alt1': '070', 'fp.alt2': '090', 'fp.hold': '20', 'fp.route1': 'V16 ' + MARK, 'fp.fob': '2+15', 'fp.route2': 'V17 ' + MARK,
        'fp.termRoute': 'TERM' + MARK, 'fp.v1': '120', 'fp.x1': '5', 'fp.w1': '7', 'fp.v2': '66', 'fp.x2': '4', 'fp.w2': '3', 'fp.v3': '44', 'fp.x3': '2', 'fp.w3': '1',
        'scriptOpts.voidMin': '45', 'scriptOpts.nltMin': '20', 'f1751.briefTime': '1815', 'f1751.init': 'ZQ', 'f1751.flimsy': 'ZQFL', 'f1751.watch': 'ZQWT', 'f1751.notams': MARK + ' notam',
+       'dep.ctl': 'CTAF', 'd1.ctl': 'CTAF', 'd2.ctl': 'CTAF', 'dep.cdm': 'GCO', 'dep.cdPh': '555ZQMARK', 'dep.gcoF': '122.77', 'dep.ho': '#2', 'd1.ho': '#2',
        'noAlt': True, 'amr.nav1': 'Space based', 'amr.nav2': 'Conventional Ground based'}
-PRE = {'alt2.time': [('alt2.id', 'KPHX')], 'd1.tcl': [('d1.tvis', '1/2 FG')], 'd2.tcl': [('d2.tvis', '1 FG')], 'scriptOpts.voidMin': [('dep.cd', 'RELAY')], 'scriptOpts.nltMin': [('dep.cd', 'RELAY')]}
+PRE = {'alt2.time': [('alt2.id', 'KPHX')], 'd1.tcl': [('d1.tvis', '1/2 FG')], 'd2.tcl': [('d2.tvis', '1 FG')], 'scriptOpts.voidMin': [('dep.cd', 'RELAY')], 'scriptOpts.nltMin': [('dep.cd', 'RELAY')],
+       'dep.cdm': [('dep.ctl', 'CTAF')], 'dep.cdPh': [('dep.ctl', 'CTAF')], 'dep.gcoF': [('dep.ctl', 'CTAF'), ('dep.cdm', 'GCO')]}
 # which outputs MUST change when the input changes (anything not listed may change too, but these are the contract)
 EXPECT = {
   'acft': ['amr', '1801', '1751'],
@@ -125,6 +127,14 @@ EXPECT = {
   'dep.altim': ['scripts', '1751'],
   'dep.apr': ['scripts'],
   'dep.cd': ['scripts'],
+  'dep.cdm': ['scripts'],
+  'dep.cdPh': ['scripts'],
+  'dep.ctl': ['scripts'],
+  'dep.gcoF': ['scripts'],
+  'dep.ho': ['scripts'],
+  'd1.ctl': ['scripts'],
+  'd1.ho': ['scripts'],
+  'd2.ctl': ['scripts'],
   'dep.ceil': ['scripts', '1751'],
   'dep.ct': ['scripts', '1751'],
   'dep.dp': ['scripts', '1751'],
@@ -265,6 +275,50 @@ def specials(pg):
     check('Plan page + nav say DD 1801, never "DD 175 "', 'DD 1801' in txt and not __import__('re').search(r'DD ?175(?!-1)', txt), txt[:200])
     amr = (go_plan(pg), pg.click('#tabs [data-tab="amr"]'), pg.wait_for_timeout(300), pg.inner_text('#view-amr'))[3]
     check('AMR tab: no DD 175 flight-plan text (only the DD 175-1 weather brief is referenced)', not __import__('re').search(r'DD ?175(?!-1)', amr), amr[:300])
+
+    specials_v13(pg)
+
+def specials_v13(pg):
+    """v1.3: uncontrolled field (Pinal Airpark KMZJ), clearance method, AWOS broadcast, hand-off by direction, aircraft / tail list, migration"""
+    base, paths = run(pg)
+    go_plan(pg); pick(pg, 'dep.id', 'KMZJ'); pick(pg, 'd1.id', 'KTUS'); pick(pg, 'd2.id', 'KRYN'); pg.wait_for_timeout(300)
+    ctl = pg.inner_text('#ctl-dep'); hoh = pg.inner_text('#hoh-dep')
+    check('Plan shows KMZJ as uncontrolled with its CTAF', 'No operating control tower' in ctl and '123.05' in ctl, ctl)
+    check('Plan shows the chosen first-contact facility and why (south -> Tucson Approach)', 'Tucson Approach' in hoh and 'course' in hoh, hoh)
+    opts = pg.locator('#view-plan [data-b="dep.ho"]').evaluate('e => [...e.options].map(o => o.text)')
+    check('first-contact dropdown lists Auto + candidates incl. a Center', opts[0].startswith('Auto') and any('Center' in o for o in opts) and any('Approach' in o for o in opts), str(opts))
+    check('every airport card has a visible ATIS/AWOS/ASOS dropdown', all(pg.locator(f'#view-plan [data-b="{k}.wx"]').is_visible() for k in ('dep', 'd1', 'd2')))
+    check('departure weather source dropdown offers ATIS / ASOS / AWOS and defaults to Auto -> AWOS for KMZJ', pg.locator('#view-plan [data-b="dep.wx"]').evaluate('e => [...e.options].map(o => o.value).join()') == 'AUTO,ATIS,ASOS,AWOS' and 'AWOS' in pg.inner_text('#wxh-dep'), pg.inner_text('#wxh-dep'))
+    check('clearance method controls are visible for an uncontrolled departure; the towered clearance type is hidden', pg.locator('#view-plan [data-b="dep.cdm"]').is_visible() and not pg.locator('#view-plan [data-b="dep.cd"]').is_visible())
+    t = go_scripts(pg)
+    check('Scripts: Pinal AWOS broadcast wording', 'Pinal Airpark automated weather,' in t and 'Information' not in t.split('DESTINATION 1')[0] and '(repeats)' in t, t[:400])
+    check('Scripts: clearance by phone with the FAA number, no taxi/takeoff clearance, CTAF advisories', 'clearance by phone' in t.lower() and '520-829-6121' in t and 'ctaf advisory - taxi' in t.lower() and 'ctaf advisory - departure' in t.lower() and 'Cleared for Takeoff' not in t.split('DESTINATION 1')[0], t[:300])
+    check('Scripts: departing toward the southeast hands to Tucson Approach', 'Tucson Approach, Army Copter' in t and 'departing to the southeast' in t)
+    go_plan(pg); pg.select_option('#view-plan [data-b="dep.cdm"]', 'GCO'); setv(pg, 'dep.gcoF', '122.7'); t = go_scripts(pg)
+    check('GCO mode + frequency from the Plan show in Scripts', 'clearance by gco' in t.lower() and 'On the GCO 122.7' in t)
+    go_plan(pg); pg.select_option('#view-plan [data-b="dep.cdm"]', 'AIR'); t = go_scripts(pg)
+    check('Airborne pickup mode shows in Scripts', 'airborne pickup' in t.lower())
+    go_plan(pg); pg.select_option('#view-plan [data-b="dep.cdm"]', 'PHONE'); pick(pg, 'd1.id', 'KCGZ'); pick(pg, 'd2.id', 'KPHX'); pg.wait_for_timeout(300)
+    hoh = pg.inner_text('#hoh-dep'); check('Plan: north toward KCGZ -> Albuquerque Center', 'Albuquerque Center' in hoh, hoh)
+    t = go_scripts(pg); check('Scripts: north departure calls Albuquerque Center, takeoff to the northwest', 'Albuquerque Center, Army Copter' in t and 'departing to the northwest' in t)
+    go_plan(pg); o = pg.locator('#view-plan [data-b="dep.ho"]').evaluate('e => [...e.options].map(o => [o.value, o.text])'); tus = [v for v, tx in o if v != 'AUTO' and 'Tucson' in tx]
+    if tus:
+        pg.select_option('#view-plan [data-b="dep.ho"]', tus[0]); t = go_scripts(pg)
+        check('override dropdown (Tucson) beats the direction rule', 'Tucson Approach, Army Copter' in t, t[:200])
+    else: check('override candidates include Tucson', False, str(o))
+    # towered -> towered keeps the tower flow
+    go_plan(pg); pick(pg, 'dep.id', 'KTUS'); pick(pg, 'd1.id', 'KRYN'); pick(pg, 'd2.id', 'KDMA'); t = go_scripts(pg)
+    check('towered -> towered: Taxi / Takeoff / Tower calls (no CTAF advisories)', 'Cleared for Takeoff' in t and 'ctaf advisory' not in t.lower())
+    # aircraft / tails
+    go_plan(pg)
+    acs = pg.locator('#view-plan [data-b="acft"]').evaluate('e => [...e.options].map(o => o.value).join()')
+    dl = pg.evaluate("[...document.querySelectorAll('#dl-dev option')].map(o => o.value)")
+    check('aircraft = UH-72 / UH-60L / UH-60M only (no TH-67)', acs == 'UH-72,UH-60L,UH-60M', acs)
+    check('device list is plain tail numbers, no colour labels', len(dl) >= 20 and all(x.isdigit() for x in dl), str(dl[:5]))
+    # saved mission from v1.2 with removed options migrates
+    pg.evaluate("""() => { const m = JSON.parse(localStorage.getItem('amr.current.v1')); m.acft = 'TH-67'; m.device = 'BLUE 3'; localStorage.setItem('amr.current.v1', JSON.stringify(m)); }""")
+    pg.reload(wait_until='networkidle'); pg.wait_for_function('window.__amr && __amr.S && __amr.S.m')
+    r = pg.evaluate('[__amr.S.m.acft, __amr.S.m.device]'); check('saved TH-67 / BLUE 3 mission migrates to UH-72 / 78724', r == ['UH-72', '78724'], str(r))
 
 if __name__ == '__main__':
     shard, nshard = 0, 1
