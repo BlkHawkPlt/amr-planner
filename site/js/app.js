@@ -2,11 +2,11 @@
 (function () {
   'use strict';
   const M = window.AMRModel, D = window.AMRData;
-  const VERSION = '1.0.0';
+  const BUILD = window.AMR_BUILD || { version: '?', commit: 'dev', built: '' }, VERSION = BUILD.version;
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const LS = { cur: 'amr.current.v1', missions: 'amr.missions.v1', settings: 'amr.settings.v1' };
-  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ' }, tab: 'plan', fp: '1801', dirtyPlan: false };
+  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
   const env = { ap: id => D.ap(id), acft: d => D.acft(d), device: d => D.device(d), get compat() { return S.settings.compat; } };
 
   /* ---------- storage ---------- */
@@ -17,6 +17,8 @@
     if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = (over && k in over) ? merge(base[k], over[k]) : base[k]; if (over) for (const k in over) if (!(k in o)) o[k] = over[k]; return o; }
     return over === undefined ? base : over;
   }
+  // older saves called the flight-plan inputs 'f175' (the DD 175 was the flight plan); the DD 1801 is now the flight plan
+  function migrate(o) { o = o || {}; if (o.f175 && !o.fp) o.fp = o.f175; delete o.f175; return o; }
   let saveT = null;
   function save() { clearTimeout(saveT); saveT = setTimeout(() => jset(LS.cur, S.m), 150); }
   function getp(path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), S.m); }
@@ -94,19 +96,21 @@
       ${F('Mission statement override', area('amr.missionTxt', 'Blank = generated from airports, ETD, purpose'), 'full')}
       ${F('Special instructions override', area('amr.specialTxt', 'Blank = generated'), 'full')}
       ${F("Commander's intent", area('amr.intent'), 'full')}${F('Remarks', area('amr.remarks'), 'full')}</div></section>
-    <section class="card"><h2>DD 175 flight plan</h2><div class="grid g3">
-      ${F('ETD (Z, HHMM)', inp('f175.etd', { attrs: 'inputmode="numeric" maxlength="4"', ph: '1930' }))}
-      ${F('Planning TAS (KIAS)', inp('f175.tas', { attrs: 'inputmode="numeric"' }))}
-      ${F('Flight rules', sel('f175.rules', ['I', 'V']))}
-      ${F('Alt leg 1 (hundreds)', inp('f175.alt1', { attrs: 'inputmode="numeric" maxlength="3"', ph: '040' }))}
-      ${F('Alt leg 2 (hundreds)', inp('f175.alt2', { attrs: 'inputmode="numeric" maxlength="3"', ph: '040' }))}
-      ${F('Ground time dest 1 (min)', inp('f175.hold', { attrs: 'inputmode="numeric"' }))}
-      ${F('Route leg 1', inp('f175.route1', { ph: 'DIRECT' }), 'span2')}${F('Fuel on board', inp('f175.fob'))}
-      ${F('Route leg 2', inp('f175.route2', { ph: 'DIRECT' }), 'span2')}${F('Terminal-area delay routing', inp('f175.termRoute'))}</div>
+    <section class="card"><h2>Flight plan <small>DD 1801</small></h2><div class="grid g3">
+      ${F('ETD (Z, HHMM)', inp('fp.etd', { attrs: 'inputmode="numeric" maxlength="4"', ph: '1930' }))}
+      ${F('Planning TAS (KIAS)', inp('fp.tas', { attrs: 'inputmode="numeric"' }))}
+      ${F('Flight rules', sel('fp.rules', ['I', 'V']))}
+      ${F('Alt leg 1 (hundreds)', inp('fp.alt1', { attrs: 'inputmode="numeric" maxlength="3"', ph: '040' }))}
+      ${F('Alt leg 2 (hundreds)', inp('fp.alt2', { attrs: 'inputmode="numeric" maxlength="3"', ph: '040' }))}
+      ${F('Ground time dest 1 (min)', inp('fp.hold', { attrs: 'inputmode="numeric"' }))}
+      ${F('Route leg 1', inp('fp.route1', { ph: 'DIRECT' }), 'span2')}${F('Fuel on board', inp('fp.fob'))}
+      ${F('Route leg 2', inp('fp.route2', { ph: 'DIRECT' }), 'span2')}${F('Terminal-area delay routing', inp('fp.termRoute'))}
+      ${F('Clearance void (min after ETD)', inp('scriptOpts.voidMin', { attrs: 'inputmode="numeric"', ph: '30' }), '', '<span class="hint">Void = ETD + this (relay clearance script)</span>')}${F('NLT advise (min after ETD)', inp('scriptOpts.nltMin', { attrs: 'inputmode="numeric"', ph: '30' }), '', '<span class="hint">NLT = ETD + this</span>')}</div>
+      <div class="msg ok" id="timing" style="margin-top:8px"></div>
       <h3>Distances (nm)</h3><div class="grid g3">
-      ${F('Leg 1 dist', inp('f175.v1', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc1"></span>')}${F('Leg 1 + (SID/STAR/app)', inp('f175.x1', { attrs: 'inputmode="decimal"' }))}${F('Leg 1 PT/Hold min', inp('f175.w1', { attrs: 'inputmode="decimal"' }))}
-      ${F('Leg 2 dist', inp('f175.v2', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc2"></span>')}${F('Leg 2 + (SID/STAR/app)', inp('f175.x2', { attrs: 'inputmode="decimal"' }))}${F('Leg 2 PT/Hold min', inp('f175.w2', { attrs: 'inputmode="decimal"' }))}
-      ${F('To ALT dist', inp('f175.v3', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc3"></span>')}${F('To ALT +', inp('f175.x3', { attrs: 'inputmode="decimal"' }))}${F('ALT PT/Hold min', inp('f175.w3', { attrs: 'inputmode="decimal"' }))}</div>
+      ${F('Leg 1 dist', inp('fp.v1', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc1"></span>')}${F('Leg 1 + (SID/STAR/app)', inp('fp.x1', { attrs: 'inputmode="decimal"' }))}${F('Leg 1 PT/Hold min', inp('fp.w1', { attrs: 'inputmode="decimal"' }))}
+      ${F('Leg 2 dist', inp('fp.v2', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc2"></span>')}${F('Leg 2 + (SID/STAR/app)', inp('fp.x2', { attrs: 'inputmode="decimal"' }))}${F('Leg 2 PT/Hold min', inp('fp.w2', { attrs: 'inputmode="decimal"' }))}
+      ${F('To ALT dist', inp('fp.v3', { attrs: 'inputmode="decimal"' }), '', '<span class="hint" id="gc3"></span>')}${F('To ALT +', inp('fp.x3', { attrs: 'inputmode="decimal"' }))}${F('ALT PT/Hold min', inp('fp.w3', { attrs: 'inputmode="decimal"' }))}</div>
       <p class="fx"><button class="btn sm" id="btnGC">Fill distances from airport positions</button> great-circle nm - add procedure miles yourself.</p></section>
     <section class="card"><h2>DD 175-1 weather brief</h2><div class="grid g2">
       ${F('WX briefed time (Z)', inp('f1751.briefTime', { attrs: 'inputmode="numeric" maxlength="4"' }))}
@@ -171,10 +175,14 @@
     const d = (a, b) => (p(a) && p(b)) ? Math.round(M.nm(p(a), p(b))) + ' nm direct' : '';
     $('#gc1') && ($('#gc1').textContent = d(S.m.dep, S.m.d1)); $('#gc2') && ($('#gc2').textContent = d(S.m.d1, S.m.d2)); $('#gc3') && ($('#gc3').textContent = d(S.m.d1, S.m.d2));
   }
+  function renderTiming() {
+    const el = $('#timing'); if (!el) return; const f = M.flight(S.m, env), o = S.m.scriptOpts || {}, mins = v => (String(v == null ? '' : v).trim() === '' || isNaN(+v) ? 30 : Math.max(0, Math.round(+v)));
+    el.innerHTML = `ETD <b>${M.hhmm(f.etd1)}Z</b> • leg 1 ETE <b>${M.hplusmm(f.ete1)}</b> → ETA <b>${M.hhmm(f.eta1)}Z</b> • leg 2 ETD <b>${M.hhmm(f.etd2)}Z</b>, ETE <b>${M.hplusmm(f.ete2)}</b>, ETA <b>${M.hhmm(f.eta2)}Z</b> • clearance void <b>${M.hhmm(f.etd1 + mins(o.voidMin))}Z</b>, NLT <b>${M.hhmm(f.etd1 + mins(o.nltMin))}Z</b>`;
+  }
   function refreshPlan(only) {
     const ks = only ? [only] : ['dep', 'd1', 'd2'];
     ks.forEach(k => { fillDyn(k); renderInfo(k); renderMsgs(k); });
-    renderAlt(); renderSerial(); renderGC();
+    renderAlt(); renderSerial(); renderGC(); renderTiming();
   }
 
   /* ---------- picker ---------- */
@@ -226,10 +234,10 @@
     if (path === 'acft') renderSerial();
     if (/^(d1|d2)\./.test(path) || path === 'noAlt') renderAlt();
     if (path === 'name') $('#missionLabel').textContent = v || 'New mission';
+    if (/^(fp|scriptOpts)\./.test(path)) renderTiming();
     if (/^(dep|d1|d2)\.wx$/.test(path)) renderInfo(k);
     if (S.tab !== 'plan') S.dirtyPlan = true;
     if (S.tab === 'fp' || S.tab === '1751') schedPdf();
-    else if (S.tab === 'scripts') { const y = window.scrollY; $('#view-scripts').innerHTML = viewScripts(); window.scrollTo(0, y); }
   }
 
   /* ---------- OUTPUT: AMR ---------- */
@@ -237,21 +245,21 @@
   function footer() { const c = D.cycle; return `<div class="foot">Generated by IFR AMR Planner v${VERSION} • FAA data cycle ${esc(c.tpp)} (eff ${esc(c.from.slice(0, 10))} to ${esc(c.to.slice(0, 10))}) • Training/planning aid - verify against current FAA publications.</div>`; }
   function barHTML(title) { return `<div class="outbar noprint"><button class="btn pri" data-act="print">Print / Save PDF</button><button class="btn" data-act="share">Share text</button><button class="btn" data-act="goplan">Edit inputs</button></div><div class="fx noprint swipe" style="margin:-4px 0 6px">Swipe sideways to see the whole form on a phone — Print / Save PDF always fits the page.</div>`; }
   function viewAMR() {
-    const o = M.amr(S.m, env), dd = M.dd175(S.m, env);
+    const o = M.amr(S.m, env);
     const kv = (a, b) => `<tr><td class="l">${a}</td><td>${b}</td></tr>`;
     return `${barHTML()}<h1>AIR MISSION REQUEST</h1>
       <p class="sub" style="text-align:center">${esc(S.m.date)} • ${esc(S.m.dep.id)} → ${esc(S.m.d1.id)} → ${esc(S.m.d2.id)}</p>
       <table><tr><th>#</th><th>Airfield</th></tr><tr><td>1</td><td>${esc(o.I1)}</td></tr><tr><td>2</td><td>${esc(o.I2)}</td></tr><tr><td>3</td><td>${esc(o.I3)}</td></tr></table>
       <h2>MISSION</h2><p>${esc(o.mission)}</p><h2>Special Instructions</h2><p>${esc(o.special)}</p><h2>Commanders Intent</h2><p>${esc(o.intent)}</p>
       <h2>Planning Information</h2><table>${kv('Aircraft:', esc(o.aircraft) + ' &nbsp; ' + esc(o.design))}${kv('Serial Number:', esc(o.serial))}${kv('Gross Weight:', esc(o.gw))}${kv('Planning Fuel:', esc(o.fuel))}${kv('Weight &amp; Balance:', esc(o.wb))}${kv('Unit / Station:', esc(o.unit))}</table>
-      <h2>Performance Planning</h2><table>${kv('Hover Power:', esc(o.hover))}${kv('Climb Power:', esc(o.climb))}${kv('Cruise Power:', esc(o.cruise))}${kv('Fuel Burn Rate:', esc(o.burn))}${kv('True Airspeed:', esc(S.m.f175.tas) + ' KIAS (increase 1 KIAS per 1000 feet MSL)')}</table>
+      <h2>Performance Planning</h2><table>${kv('Hover Power:', esc(o.hover))}${kv('Climb Power:', esc(o.climb))}${kv('Cruise Power:', esc(o.cruise))}${kv('Fuel Burn Rate:', esc(o.burn))}${kv('True Airspeed:', esc(S.m.fp.tas) + ' KIAS (increase 1 KIAS per 1000 feet MSL)')}</table>
       <h2>Passengers</h2><p>${esc(o.pax.name)}${o.pax.rank ? ' • ' + esc(o.pax.rank) : ''}${o.pax.org ? ' • ' + esc(o.pax.org) : ''}</p>
       <h2>CREW</h2><table><tr><th>Name</th><th>Rank</th><th>Organization / Station</th></tr>${o.crew.map(c => `<tr><td>${esc(c.name) || '&nbsp;'}</td><td>${esc(c.rank)}</td><td>${esc(c.org)}</td></tr>`).join('')}</table>
       <h2>Remarks</h2><p>${pre(o.remarks)}</p>
       <h2>Publications</h2><table>${kv('ELA:', esc(o.ela))}${kv('VFR Sectional:', esc(o.sect))}${kv('IAP:', esc(o.iap))}</table>${footer()}`;
   }
 
-  /* ---------- OUTPUT: DD 175 ---------- */
+  /* ---------- OUTPUT: official forms ---------- */
   function fmtDate(iso) { const [y, m, d] = String(iso).split('-'); const mo = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][+m - 1]; return `${d}-${mo}-${String(y).slice(2)}`; }
 
   /* ---------- OFFICIAL FORMS: the DoD PDF is filled with pdf-lib and previewed with pdf.js ---------- */
@@ -262,7 +270,7 @@
     '1751': { f: 'dd175-1', t: 'DD Form 175-1 - Flight Weather Briefing', ed: '1 Oct 2002', pdf: 'DD175-1' }
   };
   const PDF = { zoom: 'fit', tok: 0, cache: {}, task: null, last: null };
-  const curForm = () => (S.tab === '1751' ? '1751' : S.fp);
+  const curForm = () => (S.tab === '1751' ? '1751' : S.sub);
   const pdfLibsOK = () => window.PDFLib && window.pdfjsLib && window.AMRForms;
   async function pdfAsset(url, json) {
     if (PDF.cache[url]) return PDF.cache[url];
@@ -331,12 +339,13 @@
 
   /* ---------- Flight plan tab: DD 1801 (primary), 1801-C, DD 175 (legacy) ---------- */
   function viewFP() {
-    const fk = S.fp, tabs = [['1801', 'DD 1801'], ['1801c', 'DD 1801-C'], ['175', 'DD 175 · legacy']];
+    if (S.sub === '175' && !S.settings.legacy175) S.sub = '1801';
+    const fk = S.sub, tabs = [['1801', 'DD 1801'], ['1801c', 'DD 1801-C']].concat(S.settings.legacy175 ? [['175', 'DD 175 · legacy']] : []);
     const nav = `<div class="subnav noprint">${tabs.map(([k, l]) => `<button class="${k === fk ? 'on' : ''}" data-fp="${k}">${l}</button>`).join('')}</div>`;
     let top = '';
     if (fk === '1801') top = inputs1801();
     else if (fk === '1801c') top = `<div class="card"><h2>DD Form 1801-C (continuation)</h2><p class="fx" style="margin:0">Block 1 = leg 2 (${esc(S.m.d1.id)} → ${esc(S.m.d2.id)}); block 2 = ${esc(S.m.d2.id)} → second alternate when one is entered on the Plan tab; block 3 stays blank. Items 7, 8, 10, 15, 18 and 19 follow the DD 1801 inputs.</p></div>`;
-    else top = `<div class="card"><h2>DD Form 175 - legacy</h2><p class="fx" style="margin:0">The DD 175 (May 1986) is kept for units that still use it; the DD 1801 is the primary flight plan. Inputs (ETD, TAS, altitude, route, fuel) are on the Plan tab and shared with the DD 1801.</p></div>`;
+    else top = `<div class="card"><h2>DD Form 175 - legacy</h2><p class="fx" style="margin:0">The DD 175 (May 1986) is shown only because "Show legacy DD 175" is on in Info. The DD 1801 is the flight plan; its inputs (ETD, TAS, altitude, route, fuel) are on the Plan tab and this form is filled from the same inputs, with its own altitude-adjusted TAS and ETE.</p></div>`;
     return `${nav}${pdfPanel()}${top}${footer()}`;
   }
   function inputs1801() {
@@ -394,17 +403,13 @@
     const c = M.calls(S.m, env), g = c.grade, m = S.m, h = c.hdr;
     const sc = (title, key, hk) => g[key] === '' || g[key] == null ? '' : `<div class="script"><h3>${esc(title)}<button class="btn sm" data-copy="${esc(M.plain(g[key]))}">Copy</button></h3>${h[hk || key] ? `<div class="facl">${esc(h[hk || key])}</div>` : ''}<p>${mark(g[key])}</p></div>`;
     const left = [...new Set(Object.values(g).flatMap(t => M.blanks(t)))];
-    const ctl = k => {
-      const x = m[k], a = D.ap(x.id), w = c.src[k];
-      return `<div class="sctl"><b>${esc(APN[k])} ${esc(x.id)}</b>
-        <label>Weather<select data-b="${k}.wx">${optList(M.WX_CHOICES, x.wx || 'AUTO')}</select></label>
-        <label>Approach<select data-b="${k}.apr">${optList((a && a.i) || [], x.apr, '— none —')}</select></label>
-        <label>Runway<select data-b="${k}.rwy">${optList((a && a.r) || [], x.rwy, '— runway —')}</select></label>
-        ${k === 'dep' ? `<label>SID<select data-b="dep.sid">${optList((a && a.d) || [], x.sid, '— none —')}</select></label>` : `<label>STAR<select data-b="${k}.star">${optList((a && a.s) || [], x.star, '— none —')}</select></label>`}
-        <div class="fx" style="grid-column:1/-1">${esc((w.auto ? 'Auto: ' : '') + w.tip)}</div></div>`;
+    const row = k => {          // read-only: the Plan tab is the single source of truth, nothing here can diverge from it
+      const x = m[k], w = c.src[k];
+      return `<div class="sctl"><b>${esc(APN[k])} ${esc(x.id)}</b><div class="kv" style="grid-column:1/-1"><b>Weather</b><span>${esc((w.auto ? 'Auto → ' : '') + w.label)}${w.freq && w.freq.txt ? ' • ' + esc(w.freq.txt) : ''}${w.phone ? ' • ph ' + esc(w.phone) : ''}</span>
+        <b>Approach</b><span>${esc(x.apr || '—')}</span><b>Runway</b><span>${esc(x.rwy || '—')}</span><b>${k === 'dep' ? 'SID / transition' : 'STAR'}</b><span>${esc(k === 'dep' ? ((x.sid || '—') + (x.trans ? ' / ' + x.trans : '')) : (x.star || '—'))}</span></div></div>`;
     };
     return `<div class="outbar"><button class="btn pri" data-act="print">Print / Save PDF</button><button class="btn" data-act="goplan">Edit inputs</button></div>
-      <div class="card noprint"><h2>Script settings <small>updates live with the plan</small></h2><div class="sctls">${ctl('dep')}${ctl('d1')}${ctl('d2')}</div>
+      <div class="card noprint"><h2>Plan used for these scripts <button class="btn sm" data-act="goplan">Change on Plan tab</button></h2><div class="sctls">${row('dep')}${row('d1')}${row('d2')}</div>
         <p class="fx" style="margin:6px 0 0"><span class="fv">Blue</span> = filled from your plan, the AMR inputs and FAA data. <span class="bk">[red]</span> = ATC assigns it live, so nothing can fill it${left.length ? ': ' + esc(left.join(', ')) : ''}.</p></div>
       <div class="script"><h3>Grade sheet setup</h3><p>${esc(g.cockpit)}   •   ${esc(g.simTemp)}   •   Date ${esc(fmtDate(m.date))}</p></div>
       <div class="s2"><div>
@@ -434,6 +439,7 @@
       <div class="grid g2" style="margin-top:8px">${F('Data cycle', `<select id="cycSel"><option value="auto"${S.settings.cycle === 'auto' ? ' selected' : ''}>Automatic (by today's date)</option>${cyc.map(x => `<option value="${x.tpp}"${S.settings.cycle === x.tpp ? ' selected' : ''}>${x.tpp} (${x.from.slice(0, 10)} → ${x.to.slice(0, 10)})</option>`).join('')}</select>`)}</div>
       <div class="msg warn" style="margin-top:8px"><b>For training and planning only.</b> Airport data, runways, approaches, SIDs, STARs and frequencies come from the FAA NASR subscription and d-TPP metafile and are <b>not</b> a substitute for current FAA / DoD flight publications (IFR Supplement, charts, NOTAMs). Verify everything against current publications before flight.</div></section>
     <section class="card"><h2>Settings</h2>
+      <div class="f chk"><input type="checkbox" id="legacy175" ${S.settings.legacy175 ? 'checked' : ''}><label for="legacy175">Show legacy DD 175 (the DD 1801 is the flight plan)</label></div>
       <div class="f chk"><input type="checkbox" id="compat" ${S.settings.compat ? 'checked' : ''}><label for="compat">Workbook-compatible mode (reproduce workbook quirks)</label></div>
       <p class="fx">Off (default): density altitude uses the correct formula, the ATIS "Landing and Departing RWY…" line is dropped when the approach is to the runway in use, and Destination 1's pressure altitude uses Destination 1's elevation. On: the original workbook formulas are reproduced exactly (misplaced-parenthesis density altitude, always adding the landing-RWY sentence for numeric runways, departure elevation for Dest 1).</p>
       <h3>Data on this device</h3><button class="btn danger sm" id="btnWipe">Erase saved missions &amp; settings</button></section>
@@ -443,12 +449,16 @@
     <section class="card wide"><h2>Official forms</h2>
       <table class="ref"><tr><td><b>DD Form 1801</b></td><td>DoD International Flight Plan - edition 1 May 1987 (primary flight plan)</td></tr>
       <tr><td><b>DD Form 1801-C</b></td><td>Continuation - edition 21 May 2019</td></tr>
-      <tr><td><b>DD Form 175</b></td><td>Military Flight Plan - edition 1 May 1986 (legacy; kept for units that still use it)</td></tr>
+      <tr><td><b>DD Form 175</b></td><td>Military Flight Plan - edition 1 May 1986 (legacy; hidden unless enabled below)</td></tr>
       <tr><td><b>DD Form 175-1</b></td><td>Flight Weather Briefing - edition 1 Oct 2002</td></tr></table>
       <p class="fx">The forms are the official DoD PDFs (esd.whs.mil/Directives/forms). Your data is typed into the form's own fields, so every box is where DoD put it; page size is Letter (the DD 175 is Letter landscape). Print at <b>100% / Actual size</b>. To make the PDFs fillable in a browser, the build removes the PDF's encryption (empty user password), its Adobe-only XFA layer and its screen-only Reset/Signature buttons - the printed page itself is untouched (verified by tests/form_fidelity.py). Not an official DoD product; verify the filed plan against current regulations.</p>
       <p class="fx"><b>Approach fixes, crossing altitudes and missed approaches</b> come from the FAA Coded Instrument Flight Procedures (CIFP, ARINC 424-18; not copyrighted). CIFP is provided "as is" with no warranty; under 10 U.S.C. 456 no civil action may be brought against the United States on the basis of the content of a navigational aid prepared or disseminated by the FAA. The FAA is not responsible for products derived from CIFP, and DoD-originated (NGA) procedures are not in it - those scripts keep a blank. Always use the published procedure; report suspected CIFP errors to the FAA (9-AMC-Aerochart@faa.gov, 800-638-8972).</p>
       <p class="fx"><b>Weather source:</b> AWOS/ASOS airports have no ATIS letter. Auto picks ATIS when the FAA data lists an ATIS frequency, otherwise AWOS/ASOS (type, phone and frequency from NASR); override per airport on the Plan or Scripts tab.</p></section>
-    <section class="card wide"><h2>About</h2><p class="fx">IFR AMR Planner v${VERSION}. Replaces the Cheat Sheet → AMR / DD 175 / DD 175-1 / Grade Sheet workflow of the Army instrument AMR Excel template. Works offline after the first load; add to the Home Screen from Safari's Share menu. Missions are saved only in this browser (localStorage) - use Missions → Export to back them up. Not covered in v1: DD 1801 / 1801-C, other states, ADS-B/winds-aloft/live weather.</p></section></div>`;
+    <section class="card wide"><h2>App version</h2>
+      <div class="kv"><b>Version</b><span id="verTxt">v${esc(BUILD.version)}</span><b>Build</b><span id="verBuild">${esc(BUILD.commit)}${BUILD.built ? ' • ' + esc(BUILD.built) : ''}</span><b>Latest</b><span id="verLatest">checking…</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="btnUpd">Check for updates</button><button class="btn" id="btnHard">Force refresh app files</button></div>
+      <p class="fx">New releases install themselves: the app reloads when it finds one (your inputs are saved first). If something looks out of date, tap "Force refresh app files" - it clears this app's cached files (not your missions) and reloads.</p></section>
+    <section class="card wide"><h2>About</h2><p class="fx">IFR AMR Planner v${VERSION}. Replaces the Cheat Sheet → AMR / DD 1801 / DD 175-1 / Grade Sheet workflow of the Army instrument AMR Excel template. Works offline after the first load; add to the Home Screen from Safari's Share menu. Missions are saved only in this browser (localStorage) - use Missions → Export to back them up. Not covered in v1: DD 1801 / 1801-C, other states, ADS-B/winds-aloft/live weather.</p></section></div>`;
   }
 
   /* ---------- views ---------- */
@@ -468,6 +478,10 @@
   }
   function wireInfo() {
     const cs = $('#cycSel'); cs && cs.addEventListener('change', async () => { S.settings.cycle = cs.value; jset(LS.settings, S.settings); await reloadData(); toast('Using cycle ' + D.cycle.tpp); });
+    const bu = $('#btnUpd'); bu && bu.addEventListener('click', async () => { $('#verLatest').textContent = 'checking…'; await checkVersion(true); });
+    const bh = $('#btnHard'); bh && bh.addEventListener('click', hardRefresh);
+    checkVersion(false);
+    const lg = $('#legacy175'); lg && lg.addEventListener('change', () => { S.settings.legacy175 = lg.checked; jset(LS.settings, S.settings); toast(lg.checked ? 'DD 175 (legacy) shown on the DD 1801 tab' : 'DD 175 hidden'); });
     const cp = $('#compat'); cp && cp.addEventListener('change', () => { S.settings.compat = cp.checked; jset(LS.settings, S.settings); toast(cp.checked ? 'Workbook-compatible mode ON' : 'Workbook-compatible mode OFF'); });
     const bw = $('#btnWipe'); bw && bw.addEventListener('click', () => { if (confirm('Erase all saved missions and settings on this device?')) { Object.values(LS).forEach(k => localStorage.removeItem(k)); location.reload(); } });
   }
@@ -495,7 +509,7 @@
     m.hidden = false;
   }
   async function loadMission(obj) {
-    S.m = merge(M.defaultMission(), obj); jset(LS.cur, S.m);
+    S.m = merge(M.defaultMission(), migrate(obj)); jset(LS.cur, S.m);
     await ensureStates(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
   }
   async function ensureStates() {   // lazy-load the state of every airport on the mission (v1: AZ only)
@@ -524,10 +538,10 @@
 
   /* ---------- share ---------- */
   function amrText() {
-    const o = M.amr(S.m, env), d = M.dd175(S.m, env);
+    const o = M.amr(S.m, env), d = M.dd1801(S.m, env), f = M.flight(S.m, env);
     return ['AIR MISSION REQUEST - ' + S.m.date, '', 'MISSION: ' + o.mission, '', 'SPECIAL INSTRUCTIONS: ' + o.special, '', "COMMANDER'S INTENT: " + o.intent, '',
       `AIRCRAFT: ${o.aircraft} ${o.design}  SER: ${o.serial}  GW: ${o.gw}  FUEL: ${o.fuel}`, `TAS: ${o.tas}  HOVER ${o.hover}  CLIMB ${o.climb}  CRUISE ${o.cruise}`, '',
-      `DD175: ${d.leg1.dep} ETD ${d.leg1.etd}Z ${d.leg1.alt} -> ${d.leg1.to} ETE ${d.leg1.ete}; ${d.leg2.dep} ETD ${d.leg2.etd}Z -> ${d.leg2.to} ETE ${d.leg2.ete}`,
+      `DD 1801: ${S.m.dep.id} ETD ${M.hhmm(f.etd1)}Z ${d.level} -> ${S.m.d1.id} ETE ${M.hplusmm(f.ete1)}; ${S.m.d1.id} ETD ${M.hhmm(f.etd2)}Z -> ${S.m.d2.id} ETE ${M.hplusmm(f.ete2)}`,
       'Source: FAA cycle ' + D.cycle.tpp + ' - training/planning only, verify against current FAA publications.'].join('\n');
   }
   async function share() {
@@ -546,7 +560,7 @@
     document.addEventListener('click', e => {
       const pa = e.target.closest('[data-pdf]'); if (pa) { pdfAction(pa.dataset.pdf); return; }
       const zb = e.target.closest('[data-zoom]'); if (zb) { PDF.zoom = zb.dataset.zoom === 'fit' ? 'fit' : +zb.dataset.zoom; renderPdf(); return; }
-      const fb = e.target.closest('[data-fp]'); if (fb) { S.fp = fb.dataset.fp; renderView(); return; }
+      const fb = e.target.closest('[data-fp]'); if (fb) { S.sub = fb.dataset.fp; renderView(); return; }
       const ch = e.target.closest('[data-chip]'); if (ch) {
         const path = ch.dataset.chip, list = $$(`[data-chip="${path}"]`).map(b => b.dataset.c), cur = new Set(getp(path) || []);
         cur.has(ch.dataset.c) ? cur.delete(ch.dataset.c) : cur.add(ch.dataset.c); setp(path, list.filter(c => cur.has(c))); ch.classList.toggle('on'); save(); schedPdf(); return;
@@ -554,7 +568,7 @@
       const a = e.target.closest('[data-act]'); if (a) { if (a.dataset.act === 'print') printNow(); else if (a.dataset.act === 'share') share(); else if (a.dataset.act === 'goplan') setTab('plan'); }
       const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard && navigator.clipboard.writeText(c.dataset.copy).then(() => toast('Copied'), () => { }); }
       if (e.target.id === 'btnGC') {
-        const p = x => { const a = D.ap(x.id); return a && a.p; }, F1 = S.m.f175, pr = (a, b, f) => { if (p(a) && p(b)) { F1[f] = String(Math.round(M.nm(p(a), p(b)))); const el = $(`[data-b="f175.${f}"]`); el && (el.value = F1[f]); } };
+        const p = x => { const a = D.ap(x.id); return a && a.p; }, F1 = S.m.fp, pr = (a, b, f) => { if (p(a) && p(b)) { F1[f] = String(Math.round(M.nm(p(a), p(b)))); const el = $(`[data-b="fp.${f}"]`); el && (el.value = F1[f]); } };
         pr(S.m.dep, S.m.d1, 'v1'); pr(S.m.d1, S.m.d2, 'v2'); pr(S.m.d1, S.m.d2, 'v3'); save(); toast('Distances filled (direct); add procedure miles');
       }
     });
@@ -562,17 +576,59 @@
     window.addEventListener('beforeprint', () => { if (S.tab === 'plan') { /* print the plan as-is */ } });
   }
 
+  /* ---------- updates: a new release must always replace the cached one ---------- */
+  let latest = null;
+  async function checkVersion(manual) {
+    const out = $('#verLatest');
+    if (BUILD.commit === 'dev') { if (out) out.textContent = 'development build (no release info)'; return false; }
+    try {
+      const j = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json(); latest = j;
+      const newer = BUILD.commit !== 'dev' && j.commit !== BUILD.commit;
+      if (out) out.textContent = `v${j.version} • ${j.commit}${newer ? ' - NEW (this device has ' + BUILD.commit + ')' : ' - this is the latest'}`;
+      if (newer) { $('#updTxt').textContent = `Update available: v${j.version}`; $('#updBar').hidden = false; navigator.serviceWorker && navigator.serviceWorker.getRegistration().then(r => r && r.update()); }
+      else if (manual) toast('You have the latest version');
+      return newer;
+    } catch (e) { if (out) out.textContent = 'offline - could not check'; return false; }
+  }
+  async function hardRefresh() {       // last resort: drop this app's service worker + cached files (missions live in localStorage and are kept)
+    try { jset(LS.cur, S.m); const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); for (const k of await caches.keys()) if (k.startsWith('amr-planner-')) await caches.delete(k); } catch (e) { /* ignore */ }
+    location.reload();
+  }
+  async function applyUpdate() {
+    jset(LS.cur, S.m); $('#updTxt').textContent = 'Updating…';
+    try {
+      const reg = await navigator.serviceWorker.getRegistration(); if (reg) await reg.update();
+      await new Promise(r => setTimeout(r, 4000));         // the new worker reloads this page itself when it takes over
+    } catch (e) { /* fall through */ }
+    hardRefresh();
+  }
+  function watchUpdates() {
+    $('#updBtn').addEventListener('click', applyUpdate);
+    if ('serviceWorker' in navigator) {
+      const had = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {            // a new release took over: reload once (state is saved first)
+        const last = +sessionStorage.getItem('amr.rl') || 0;
+        if (!had || Date.now() - last < 15000) return;
+        sessionStorage.setItem('amr.rl', String(Date.now())); jset(LS.cur, S.m); location.reload();
+      });
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(false); });
+    setInterval(() => checkVersion(false), 30 * 60 * 1000);
+    checkVersion(false);
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
     S.settings = Object.assign(S.settings, jget(LS.settings, {}));
     await D.init(S.settings.cycle);
     await D.loadState(S.settings.state);
-    S.m = merge(M.defaultMission(), jget(LS.cur, null) || {});
+    S.m = merge(M.defaultMission(), migrate(jget(LS.cur, null)));
     badge();
     $('#view-plan').innerHTML = planHTML(); afterPlan(); wire();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-      navigator.serviceWorker.register('sw.js').catch(() => { });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => { });
     }
+    watchUpdates();
     window.__amr = { S, M, D, env, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
     document.body.dataset.ready = '1';
   }

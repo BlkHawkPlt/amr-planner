@@ -22,6 +22,7 @@
     <button id="btnPrint" class="btn pri">Print / PDF</button>
   </div>
 </header>
+<div id="updBar" class="updbar noprint" hidden><span id="updTxt">Update available</span> <button class="btn sm pri" id="updBtn">Tap to update</button></div>
 <div class="disc noprint" id="discBar"><span class="cyc" id="cycBadge" title="FAA data cycle"></span> Training &amp; planning aid only. Verify all airport, procedure, frequency and weather data against current FAA publications before flight.</div>
 <main>
   <section id="view-plan" class="view"></section>
@@ -41,6 +42,7 @@
 </nav>
 <div id="modal" class="modal noprint" hidden></div>
 <div id="toast" class="toast noprint" hidden></div>
+<script src="js/version.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/pdf.min.js"></script>
 <script src="js/model.js"></script>

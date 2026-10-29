@@ -102,8 +102,9 @@ def run(name, vp):
             check(f'[{name}] DD175 {lab}', val in vs or ws(val) in ws(' '.join(vs)), True)
         for lab, ref in (('fuel leg1', 'Q16'), ('fuel leg2', 'R16'), ('fuel leg1+alt', 'S16')):
             val = int(float(WB['DD 175'][ref].value) + 0.5); check(f'[{name}] DD175 {lab}', any((str(val) + ' ') in v for v in vs), True)
+        pg.evaluate("__amr.S.settings.legacy175 = true"); pg.click('#tabs [data-tab="amr"]'); pg.click('#tabs [data-tab="fp"]'); pg.wait_for_timeout(300)     # legacy DD 175 is hidden unless enabled on Info
         pg.click('[data-fp="175"]'); pg.wait_for_function("document.querySelector('#pdfhost').dataset.ready === '175'", timeout=20000)
-        pg.screenshot(path=f'{SHOTS}/{name}_dd175.png', full_page=True)
+        pg.screenshot(path=f'{SHOTS}/{name}_dd175.png', full_page=True); pg.evaluate("__amr.S.settings.legacy175 = false")
         pg.click('#tabs [data-tab="1751"]'); pg.wait_for_timeout(200)
         t1751 = ' '.join(pdf_items('1751'))
         for lab, ref in (('PA', 'AM4'), ('remarks', 'A9'), ('sfc wind', 'A6')):

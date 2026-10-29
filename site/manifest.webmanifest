@@ -1,7 +1,7 @@
 {
   "name": "IFR AMR Planner",
   "short_name": "AMR Planner",
-  "description": "Instrument AMR / DD 175 / 175-1 planner with offline FAA airport data. Training and planning aid only.",
+  "description": "Instrument AMR / DD 1801 flight plan / DD 175-1 weather brief / ATC script planner with offline FAA airport data. Training and planning aid only.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

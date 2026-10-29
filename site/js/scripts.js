@@ -72,9 +72,9 @@
   M.calls = function (m, env) {
     const ser = M.serNum(m, env), sn = M.last5(ser), CS = 'Army Copter ' + sn;
     const D = m.dep, A = m.d1, B = m.d2, aD = env.ap(D.id), aA = env.ap(A.id), aB = env.ap(B.id);
-    const dd = M.dd175(m, env), F = m.f175, F1 = m.f1751;
+    const dd = M.flight(m, env), F = m.fp, F1 = m.f1751;
     const sD = shortName(D, env), sA = shortName(A, env), sB = shortName(B, env), DN = sD, AN = sA, BN = sB;
-    const o = m.scriptOpts || {}, voidMin = +o.voidMin || 10, nltMin = +o.nltMin || 30;
+    const o = m.scriptOpts || {}, mins = (v, d) => (String(v == null ? '' : v).trim() === '' || isNaN(+v) ? d : Math.max(0, Math.round(+v))), voidMin = mins(o.voidMin, 30), nltMin = mins(o.nltMin, 30);
     const out = { sn, ser, src: { dep: M.wxSource(D, aD), d1: M.wxSource(A, aA), d2: M.wxSource(B, aB) } };
     const tD = towerOf(aD), tA = towerOf(aA), tB = towerOf(aB), apD = appOf(aD), apA = appOf(aA), apB = appOf(aB);
     const ctr = ctrOf(aD) || ctrOf(aA) || ctrOf(aB), ctrA = ctrOf(aA) || ctr, ctrB = ctrOf(aB) || ctr;
@@ -99,7 +99,7 @@
     const depF = apD ? apD.f : (ctrOf(aD) ? ctrOf(aD).f : null);
     const depFreqTxt = depF && depF.txt ? ' Departure frequency ' + FV + depF.txt + FE + '.' : ' Departure frequency ' + BL + 'frequency (none in FAA data)' + BE + '.';
     const sqk = ' Squawk ' + BL + 'ATC-assigned code' + BE + '.';
-    const voidT = M.hhmm(dd.etd1 + voidMin), nlt = M.hhmm(dd.etd1 + voidMin + nltMin);
+    const voidT = M.hhmm(dd.etd1 + voidMin), nlt = M.hhmm(dd.etd1 + nltMin);      // both are measured from the ETD
     const advise = (apD && apD.name) || (ctr && ctr.name) || (tD && tD.name) || '';
     out.depCd = {
       ATC: CS + ', Cleared to ' + AN + ' Airport' + sidTxt(D) + climb + depFreqTxt + sqk,

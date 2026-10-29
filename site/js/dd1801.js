@@ -28,7 +28,7 @@
 
   // one flight-plan block: leg = {dep, dest, altn, altn2 (ids), etdMin, eteMin, alt, route, fuelMin(endurance), eteAltMin}
   function block(m, env, o) {
-    const F = m.f175, G = m.f1801, ser = M.serNum(m, env), ac = env.acft(m.acft) || {};
+    const F = m.fp, G = m.f1801, ser = M.serNum(m, env), ac = env.acft(m.acft) || {};
     const dep = M.icao(o.dep, env), dest = M.icao(o.dest, env), alt1 = M.icao(o.altn, env), alt2 = M.icao(o.altn2, env);
     const digits = s(ser).replace(/[^0-9A-Za-z]/g, '').slice(1);                      // R-78724 -> 78724
     const acid = 'R' + (digits.length ? digits.slice(-5).padStart(5, '0') : '') + '0';  // workbook: R + MID(SER,3..7) + (MID(SER,8)="" -> 0)
@@ -73,7 +73,7 @@
     };
   }
   M.dd1801 = function (m, env) {
-    const F = m.f175, dd = M.dd175(m, env), tas = num(F.tas);
+    const F = m.fp, dd = M.flight(m, env), tas = num(F.tas);
     const d1 = num(F.v1) + num(F.x1), d3 = num(F.v3) + num(F.x3);
     // workbook 'DD 1801'!AN11:  ((dist + extra) / ACFT_SPEED) * 60 + time  (planning TAS, not altitude-adjusted)
     const ete1 = tas ? d1 / tas * 60 + num(F.w1) : 0, eteAlt = tas ? d3 / tas * 60 + num(F.w3) : 0;
@@ -88,7 +88,7 @@
   };
   // 1801-C: block 1 = leg 2 (Dest 1 -> Dest 2); block 2 = Dest 2 -> 2nd alternate (only if one is given); block 3 left blank (workbook: unfinished scratch)
   M.dd1801C = function (m, env) {
-    const F = m.f175, dd = M.dd175(m, env), tas = num(F.tas), d2 = num(F.v2) + num(F.x2);
+    const F = m.fp, dd = M.flight(m, env), tas = num(F.tas), d2 = num(F.v2) + num(F.x2);
     const ete2 = tas ? d2 / tas * 60 + num(F.w2) : 0;
     const first = M.dd1801(m, env);
     const endur = M.parseHHMM(s(F.fob).replace('+', ''));                          // 3+00 -> 180 min

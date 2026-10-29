@@ -25,13 +25,13 @@ SC['S1_KTUS_KRYN_KDMA'] = mk(acft='UH-72', device='GOLD 2',
     dep=dict(id='KTUS', wind='090', ws='10', vis='1 FG', ct='OVC', ceil='002', temp='18', dp='17', altim='29.92', wx='ATIS', apr='RNAV (GPS) RWY 04', rwy='4', sid='TUCSON NINE', trans='MESCA', cd='ATC', maint='060', exp='100', min='10'),
     d1=dict(id='KRYN', wind='120', ws='8', vis='1/2 FG', ct='BKN', ceil='004', temp='12', dp='11', altim='29.87', wx='ASOS', apr='ILS OR LOC RWY 06R', rwy='6R', tvis='1/4 FG', tcl='VV 001', ac='RNAV within TAA'),
     d2=dict(id='KDMA', wind='310', ws='14', vis='2 -RA', ct='OVC', ceil='006', temp='20', dp='19', altim='29.93', wx='AWOS', apr='TACAN Y RWY 13', rwy='13', ac='Vector Non RNAV'),
-    f175=dict(etd='1930', tas='110', alt1='040', alt2='060', hold='10', v1='18', x1='10', w1='0', v2='45', x2='12', w2='2', v3='30', x3='8', w3='4', fob='3+00'),
+    fp=dict(etd='1930', tas='110', alt1='040', alt2='060', hold='10', v1='18', x1='10', w1='0', v2='45', x2='12', w2='2', v3='30', x3='8', w3='4', fob='3+00'),
     f1751=dict(briefTime='1900', init='EO'), amr=dict(unit='TEST UNIT / KXXX', wb='KXXX / 01 JAN 26'))
 SC['S2_02AZ_KPHX_KFLG'] = mk(acft='UH-60M', device='BLUE 3',
     dep=dict(id='02AZ', wind='VRB', ws='5', vis='3 BR', ct='BKN', ceil='015', temp='25', dp='15', altim='30.12', wx='AWOS', apr='', rwy='H1', sid='', trans='', cd='RELAY', maint='040', exp='', min='10'),
     d1=dict(id='KPHX', wind='250', ws='12', vis='2 HZ', ct='OVC', ceil='008', temp='30', dp='20', altim='29.81', wx='ATIS', apr='ILS OR LOC RWY 25L', rwy='25L', star='EAGUL SIX (RNAV)', tvis='', tcl='', ac='NON RNAV Pub Rte'),
     d2=dict(id='KFLG', wind='200', ws='20', vis='1 SN', ct='VV', ceil='001', temp='-2', dp='-3', altim='30.05', wx='ATIS', apr='RNAV (GPS) RWY 21', rwy='21', ac='RNAV No TAA', tvis='1/2 FZFG', tcl='VV 000'),
-    f175=dict(etd='2245', tas='120', alt1='080', alt2='100', hold='15', v1='80', x1='0', w1='0', v2='110', x2='0', w2='0', v3='60', x3='0', w3='0'),
+    fp=dict(etd='2245', tas='120', alt1='080', alt2='100', hold='15', v1='80', x1='0', w1='0', v2='110', x2='0', w2='0', v3='60', x3='0', w3='0'),
     f1751=dict(briefTime='2215', init='AB'), noAlt=True)
 
 def colnum(c):
@@ -82,13 +82,13 @@ def cells_for(m):
         put(f'C{o+8}', x.get('tvis', '')); put(f'C{o+10}', x.get('tcl', '')); put(wxr, x['wx']); put(acr, x['ac'])
     put('E25', 'X' if m['noAlt'] else '')
     # AMR
-    a = m['amr']; put('B25', numish(m['f175']['tas']), 4); put('C17', a['wb'], 4); put('C18', a['unit'], 4); put('E3', a['purpose'], 4); put('D4', a['who'], 4)
+    a = m['amr']; put('B25', numish(m['fp']['tas']), 4); put('C17', a['wb'], 4); put('C18', a['unit'], 4); put('E3', a['purpose'], 4); put('D4', a['who'], 4)
     put('D5', a['nav1'], 4); put('D6', a['nav2'], 4)
     for i, r in enumerate([31, 32, 33]):
         put(f'A{r}', a['crew'][i]['name'], 4); put(f'B{r}', a['crew'][i]['rank'], 4)
     put('C33', a['crew'][2].get('org', ''), 4); put('A28', a['pax']['name'], 4)
     # DD 175
-    f = m['f175']; put('G5', hhmm_frac(f['etd']), 8); put('I5', f['alt1'], 8); put('I6', f['alt2'], 8); put('U13', numish(f['hold']), 8)
+    f = m['fp']; put('G5', hhmm_frac(f['etd']), 8); put('I5', f['alt1'], 8); put('I6', f['alt2'], 8); put('U13', numish(f['hold']), 8)
     for k in ('v', 'x', 'w'):
         for i in (1, 2, 3): put(f'{k.upper()}{4+i}', numish(f[f'{k}{i}']) if f[f'{k}{i}'] != '' else None, 8)
     put('A18', f['fob'], 8)
@@ -129,13 +129,13 @@ def norm(v):
     return str(v)
 tot = bad = 0; report = []; known = []
 def explain(name, key, w, a, m):
-    etd = m['f175']['etd']
+    etd = m['fp']['etd']
     if key == 'D175.K13': return 'CHAR(174) (registered-mark) is encoded differently by LibreOffice; same glyph in Excel'
     if key == 'Grade.N39': return 'workbook typo "Farhenheit" corrected'
     if key == 'I1751.Q4' and w == a.rstrip('Z'): return 'app appends the Z shown in the form'
-    if key in ('I1751.Q4', 'AMR.A4') and '1930' in str(w) and etd != '1930' and str(w).replace('1930', etd) == str(a).replace('1930', etd) or (key in ('I1751.Q4',) and str(w).replace('1930', etd) + 'Z' == a): return 'workbook hard-codes ETD 1930; app uses the DD 175 ETD'
+    if key in ('I1751.Q4', 'AMR.A4') and '1930' in str(w) and etd != '1930' and str(w).replace('1930', etd) == str(a).replace('1930', etd) or (key in ('I1751.Q4',) and str(w).replace('1930', etd) + 'Z' == a): return 'workbook hard-codes ETD 1930; app uses the plan ETD'
     if key.startswith('I1751.A') and w == 'DEST/ALTN' and a == '': return 'workbook labels unused forecast rows DEST/ALTN; app leaves unused rows empty'
-    if key == 'AMR.A7' and str(w).startswith('Allow 10 minutes') and 'Allow ' + str(m['f175']['hold']) + ' minutes' in str(a): return 'workbook hard-codes 10 minutes on the ground; app uses the ground-time input'
+    if key == 'AMR.A7' and str(w).startswith('Allow 10 minutes') and 'Allow ' + str(m['fp']['hold']) + ' minutes' in str(a): return 'workbook hard-codes 10 minutes on the ground; app uses the ground-time input'
     if key in ('D175.Q16', 'D175.R16', 'D175.S16'):
         try:
             if int(float(w) + 0.5) == float(a): return 'workbook cell is formatted to 0 decimals; app shows the rounded value'

@@ -39,7 +39,8 @@
              crew: [ { name: '', rank: '', role: 'PC' }, { name: '', rank: '', role: 'PI' }, { name: '', rank: '', role: 'IP', org: '' } ],
              unit: '', wb: '', ela: '', sect: '',
              remarks: 'All times published are Zulu unless stated otherwise.  (Use local time as Zulu)\nSee DD175-1 Remarks for NOTAM information' },
-      f175: { etd: '1930', tas: '110', alt1: '040', alt2: '040', rules: 'I', route1: '', route2: '', termRoute: '',
+      scriptOpts: { voidMin: '30', nltMin: '30' },                 // clearance void time and NLT, minutes after ETD (Scripts)
+      fp: { etd: '1930', tas: '110', alt1: '040', alt2: '040', rules: 'I', route1: '', route2: '', termRoute: '',
               v1: '', x1: '', w1: '', v2: '', x2: '', w2: '', v3: '', x3: '', w3: '', hold: '10', fob: '3+00' },
       f1801: { priority: 'FF', addr: ['', '', ''], filing: '', origin: '', rules: '', type: 'M', number: '', wake: '',
                nav: ['S', 'G', 'R', 'U'], surv: ['S', 'B1'], pbn: ['C2', 'S1'], pob: '', rdo: '', rmkExtra: '',
@@ -131,7 +132,7 @@
 
   /* ---------- AMR page ---------- */
   M.amr = function (m, env) {
-    const ac = env.acft(m.acft) || {}, A = m.amr, F = m.f175;
+    const ac = env.acft(m.acft) || {}, A = m.amr, F = m.fp;
     const nmid = x => M.aname(x, env) + ' (' + x.id + ')';
     const I1 = nmid(m.dep), I2 = nmid(m.d1), I3 = nmid(m.d2);
     const etd = s(F.etd).replace(/\D/g, '').padStart(4, '0').slice(-4);
@@ -160,9 +161,20 @@
     return o;
   };
 
-  /* ---------- DD 175 ---------- */
+  /* ---------- Flight plan timing: the DD 1801 is THE flight plan. One calculation feeds the DD 1801 / 1801-C, the DD 175-1 valid times, the Scripts and the AMR ---------- */
+  // workbook 'DD 1801'!AN11:  EET = ((dist + extra) / planning TAS) * 60 + time  (planning TAS, no altitude adjustment)
+  M.flight = function (m, env) {
+    const F = m.fp, tas = num(F.tas), hold = num(F.hold);
+    const d1 = num(F.v1) + num(F.x1), d2 = num(F.v2) + num(F.x2), d3 = num(F.v3) + num(F.x3);
+    const ete = (d, w) => (tas ? d / tas * 60 + num(w) : 0);
+    const ete1 = ete(d1, F.w1), ete2 = ete(d2, F.w2), ete3 = ete(d3, F.w3);
+    const etd1 = M.parseHHMM(F.etd), etd2 = etd1 + Math.floor(ete1 + 1e-6) + hold;
+    return { tas, hold, ete1, ete2, ete3, etd1, etd2, eta1: etd1 + Math.floor(ete1 + 1e-6), eta2: etd2 + Math.floor(ete2 + 1e-6) };
+  };
+
+  /* ---------- DD 175 (legacy form; kept for units that still file it - hidden unless enabled on the Info tab) ---------- */
   M.dd175 = function (m, env) {
-    const ac = env.acft(m.acft) || {}, F = m.f175, burn = num(ac.burn);
+    const ac = env.acft(m.acft) || {}, F = m.fp, burn = num(ac.burn);
     const alt1 = num(F.alt1), alt2 = num(F.alt2);
     const tas1 = num(F.tas) + alt1 * 0.1, tas2 = num(F.tas) + alt2 * 0.1;      // C5 = ACFT_SPEED + VALUE(I5)*0.1
     const d1 = num(F.v1) + num(F.x1), d2 = num(F.v2) + num(F.x2), d3 = num(F.v3) + num(F.x3);
@@ -205,7 +217,7 @@
   /* ---------- DD 175-1 ---------- */
   M.dd1751 = function (m, env) {
     const D = m.dep, A = m.d1, B = m.d2, F = m.f1751, ac = env.acft(m.acft) || {}, ser = M.serNum(m, env);
-    const dd = M.dd175(m, env), aD = env.ap(D.id) || {}, aA = env.ap(A.id) || {}, aB = env.ap(B.id) || {};
+    const dd = M.flight(m, env), aD = env.ap(D.id) || {}, aA = env.ap(A.id) || {}, aB = env.ap(B.id) || {};
     const depElev = num(aD.e);
     const pa = (alt, elev) => Math.round((29.92 - num(alt)) * 1000 + elev);
     const PA = pa(D.altim, depElev), T = num(D.temp);

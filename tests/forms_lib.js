@@ -26,7 +26,7 @@ function sampleMission(env) {
   Object.assign(m.dep, { id: 'KRYN', rwy: '6L', apr: '', sid: 'ALMON ONE (OBSTACLE) (RNAV)', wx: 'AUTO' });
   Object.assign(m.d1, { id: 'KTUS', apr: 'ILS OR LOC RWY 12', rwy: '12' });
   Object.assign(m.d2, { id: 'KIWA', apr: 'RNAV (GPS) RWY 4', rwy: '4' });
-  Object.assign(m.f175, { v1: '60', v2: '80', v3: '20', route1: 'DIRECT' });
+  Object.assign(m.fp, { v1: '60', v2: '80', v3: '20', route1: 'DIRECT' });
   m.alt2 = { id: 'KDMA', time: '0+25' };
   m.amr.unit = 'C CO 1/14 AVN / KOZR'; m.amr.crew[0].name = 'DOE, JOHN A.'; m.amr.crew[0].rank = 'CW3'; m.amr.crew[1].name = 'ROE, RICHARD'; m.amr.crew[1].rank = '1LT';
   m.amr.pax = { name: 'SMITH, JANE', rank: 'MAJ', org: 'HQ' };

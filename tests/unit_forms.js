@@ -26,6 +26,29 @@ ok('ATIS airport keeps the info-letter blank', /\u27EAinfo letter\u27EB/.test(g.
 m.d1.wx = 'ASOS'; c = M.calls(m, env);
 ok('toggling KTUS to ASOS rewrites its script', /ASOS/.test(c.grade.d1Wx) && !/info letter/.test(c.grade.d1Wx), c.grade.d1Wx);
 
+
+// ---- void / NLT: both ETD + minutes (default 30), editable
+{
+  const etd = x => { const mm = mk(); mm.fp.etd = '1930'; Object.assign(mm.scriptOpts || (mm.scriptOpts = {}), x); return M.plain(M.calls(mm, env).depCd.RELAY); };
+  const t0 = etd({ voidMin: '30', nltMin: '30' });
+  ok('void = ETD+30 and NLT = ETD+30 (ETD 1930 -> 2000Z / 2000Z)', /not off by 2000Z\. +If not off by 2000Z advise .* not later than 2000Z of intentions/.test(t0), t0);
+  ok('defaults are 30 and 30 (no scriptOpts in an old saved mission)', (() => { const mm = mk(); delete mm.scriptOpts; return /not off by 2000Z/.test(M.plain(M.calls(Object.assign(mm, { fp: Object.assign(mm.fp, { etd: '1930' }) }), env).depCd.RELAY)); })());
+  ok('defaultMission ships voidMin/nltMin = 30', M.defaultMission().scriptOpts.voidMin === '30' && M.defaultMission().scriptOpts.nltMin === '30');
+  const t1 = etd({ voidMin: '45', nltMin: '20' });
+  ok('void 45 / NLT 20 are applied independently (2015Z, 1950Z)', /not off by 2015Z\. +If not off by 2015Z advise .* not later than 1950Z/.test(t1), t1);
+  ok('blank or junk minutes fall back to 30', /not off by 2000Z.*not later than 2000Z/.test(etd({ voidMin: '', nltMin: 'abc' })));
+  ok('time wraps past midnight (ETD 2350 + 30 = 0020Z)', (() => { const mm = mk(); mm.fp.etd = '2350'; return /not off by 0020Z/.test(M.plain(M.calls(mm, env).depCd.RELAY)); })());
+}
+// ---- one timing calculation: DD 1801 formula (EET = distance / TAS + wind-related minutes), used by every output
+{
+  const mm = mk(); mm.fp.etd = '1930'; mm.fp.tas = '100'; mm.fp.hold = '10'; Object.assign(mm.fp, { v1: '100', x1: '0', w1: '5', v2: '50', x2: '0', w2: '0', v3: '0', x3: '0', w3: '0' });
+  const F = M.flight(mm, env);
+  ok('M.flight: ETE1 = 100 nm / 100 kt + 5 min = 65 min, ETA1 = ETD + 65', Math.abs(F.ete1 - 65) < 1e-6 && F.eta1 === F.etd1 + 65, JSON.stringify(F));
+  ok('M.flight: ETD2 = ETD1 + whole-minute ETE1 + hold (65 + 10)', F.etd2 === F.etd1 + 75, JSON.stringify(F));
+  ok('the 175-1 valid times follow M.flight', (() => { const d = M.dd1751(mm, env); return d.part3[0].from === M.hhmm(F.eta1 - 60) && d.part3[0].to === M.hhmm(F.eta1 + 60); })());
+  ok('the flight-plan key is fp (no f175 in a new mission)', 'fp' in M.defaultMission() && !('f175' in M.defaultMission()));
+}
+
 // ---- scripts: every fillable blank is filled
 m = mk(); c = M.calls(m, env); g = c.grade;
 const all = Object.values(g).join('\n'), plain = M.plain(all);
@@ -56,7 +79,7 @@ m2 = clone(m); m2.d1.apr = 'RNAV (GPS) RWY 11L'; m2.d1.rwy = '11L'; const c2 = M
 ok('changing the approach changes the clearance', /RNAV \(GPS\) RWY 11L/.test(c2.grade.d1Clr) && !/ILS OR LOC RWY 12/.test(c2.grade.d1Clr), c2.grade.d1Clr);
 m2 = clone(m); m2.d1.id = 'KDMA'; const c3 = M.calls(m2, env);
 ok('changing the destination changes facility names', /Davis|Monthan|Tucson/.test(c3.hdr.d1Tower + c3.hdr.d1Info) && c3.hdr.d1Tower !== c.hdr.d1Tower, c3.hdr.d1Tower);
-m2 = clone(m); m2.dep.sid = ''; ok('no SID: clearance says as filed', /as filed/i.test(M.calls(m2, env).grade.cd));
+m2 = clone(m); m2.dep.sid = ''; ok('no SID: clearance says as filed', /as filed/i.test(M.calls(m2, env).depCd.RELAY));
 m2 = clone(m); m2.amr = Object.assign({}, m2.amr); const cs = M.calls(m2, env); ok('callsign follows the device', true);
 
 // ---- DD 1801

@@ -1,7 +1,7 @@
 # IFR AMR Planner
 
 Static, offline-capable web app (PWA) for planning instrument training missions: pick date / aircraft / device, departure +
-destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, the **DD 1801** (DoD International Flight Plan; primary) with **DD 1801-C**, the legacy **DD 175**,
+destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, the **DD 1801** (DoD International Flight Plan - the flight plan everywhere in the app; ETE/ETD/ETA are the DD 1801 EET numbers) with **DD 1801-C**; the old **DD 175** is only a hidden legacy option (Info > Show legacy DD 175),
 **DD 175-1** and the **Grade Sheet ATC call scripts** (AWOS/ASOS aware, every fillable blank filled from the plan + FAA data). No backend, no accounts; inputs are saved in the browser
 (localStorage) and named missions can be saved/loaded. Arizona is loaded in v1; the data pipeline and loader are built to scale to all states.
 
@@ -13,7 +13,7 @@ destination 1 + destination 2, runway / approach / SID / STAR / weather per airp
 ## Layout
     site/                      everything that gets deployed to GitHub Pages
       index.html, css/, js/, icons/, sw.js, manifest.webmanifest   (all paths are relative -> works under /amr-planner/)
-      js/model.js              pure logic (formulas, wx validation, DD 175 / 175-1 / AMR) - testable in node
+      js/model.js              pure logic (formulas, wx validation, flight timing, DD 1801 / 175-1 / AMR; legacy DD 175) - testable in node
       js/scripts.js            Grade Sheet ATC scripts + AWOS/ASOS-vs-ATIS detection + facility lookup
       js/dd1801.js             DD 1801 / 1801-C field values (workbook mapping)
       js/forms.js              fills the OFFICIAL DoD PDFs (site/forms/*.pdf) with pdf-lib; vendor/ = pdf-lib + pdf.js (MIT / Apache-2.0)
@@ -55,9 +55,20 @@ The v1 UI loads one state (`settings.state`, default AZ); a state picker and cro
 Open airports that are public-use, or military/Coast Guard owned, or any heliport (incl. private heliports). Private airstrips,
 ultralight and glider ports are dropped unless public.
 
+## One source of truth, and updates
+The **Plan** tab is the only place inputs are edited (weather source, approach, runway, SID/STAR, ETD, void/NLT minutes, ...); AMR, DD 1801, 1801-C, 175-1 and the
+Scripts are rendered from that one saved mission, so they cannot disagree (Scripts shows a read-only summary with a "Change on Plan" button).
+Void and NLT are ETD + N minutes, default 30 / 30, both editable on the Plan tab.
+
+Releases replace each other by themselves: the deploy stamps the service-worker cache, `js/version.js` and `version.json` with the commit id;
+the new worker fills its cache with `cache:'reload'` requests (GitHub Pages' 10-minute HTTP cache cannot leak old files in), deletes old caches and reloads open windows;
+the page also compares `version.json` with its own build on launch / when brought to the foreground and shows "Update available - tap to update".
+Info shows the version + commit, "Check for updates" and "Force refresh app files" (keeps your missions).
+
 ## Run / test locally
     cd site && python3 -m http.server 8765        # http://localhost:8765/  (service worker needs localhost or https)
     pip install playwright pymupdf && playwright install chromium && tests/ci.sh
+    # ci.sh = unit, forms fidelity, data, UI smoke (iPhone+iPad), e2e_sync.py (every Plan input -> Scripts/AMR/1801/1801-C/175-1), upgrade_test.py (old releases -> new)
 
 ## Known gaps (v1)
 DD 1801 is the 1 May 1987 edition (the current DoD file is a dynamic Adobe-only form of the same edition, so the static 2023 copy is filled); military-only (NGA) approaches are not in FAA CIFP so their fix/altitude blanks stay; no state picker yet; sun times (BMNT/EENT) are a NOAA approximation; great-circle distances are hints;
