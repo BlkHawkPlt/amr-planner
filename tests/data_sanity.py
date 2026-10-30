@@ -45,6 +45,14 @@ for c in cycles:
             w = a.get('KIWA', {}).get('w'); need(w and 'AWOS' in (w.get('t') or '') and w.get('p'), f'AZ {c["tpp"]}: KIWA AWOS entry missing {w}')
             for i, d in a.items():
                 if d.get('w'): need(set(d['w']) <= {'t', 'p', 'p2', 'f'}, f'{i}: unexpected AWOS keys {list(d["w"])}')
+        if s == 'PA':
+            need(len(a) >= 390, f'PA {c["tpp"]} has only {len(a)} airports')
+            for i in ('KPIT', 'KPHL', 'KMDT', 'KABE', 'KAVP', 'KERI', 'KTHV', 'KFIG', 'KMUI'):
+                d = a.get(i); need(d is not None, f'PA {c["tpp"]}: {i} missing')
+                if d: need(d.get('r') and d.get('i') and d.get('t') and d.get('h'), f'PA {c["tpp"]}: {i} has no runways/approaches/control data')
+            need(all(d['k'] in ('PU-A', 'PU-H', 'PU-G', 'PU-U', 'MIL-A', 'MIL-H', 'PR-H') for d in a.values()), f'PA {c["tpp"]}: unexpected facility kinds (filter policy)')
+            need(a.get('KPIT', {}).get('t', {}).get('cl') == 'B' and a.get('KMDT', {}).get('t', {}).get('tw') == 1 and not a.get('KTHV', {}).get('t', {}).get('tw'), f'PA {c["tpp"]}: tower data wrong for KPIT/KMDT/KTHV')
+            need(sum(len(d.get('pr', {})) for d in a.values()) >= 100, f'PA {c["tpp"]}: fewer than 100 approaches with CIFP details')
 print(f"data sanity: {len(cycles)} cycles {[c['tpp'] for c in cycles]}, current={cur[0]['tpp'] if cur else None}, {tot} airport records, {len(fails)} failures")
 for f in fails: print('  FAIL', f)
 sys.exit(1 if fails else 0)

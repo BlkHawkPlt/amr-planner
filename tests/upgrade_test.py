@@ -5,11 +5,11 @@ For each old release (git ref): serve it (with GitHub-Pages-like Cache-Control: 
 the deploy does) and let the browser do its update check. Asserts: the open page switches to the new build by itself, old caches are gone, the
 saved mission survived, the new build serves the Plan->Scripts AWOS path. Then: a second upgrade (new -> newer) through the
 'Update available' banner when the service worker can't update, and through 'Force refresh app files'.
-   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1)"""
+   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1) 2eda131 (v1.3)"""
 import sys, os, subprocess, shutil, threading, json, http.server, functools
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-refs = sys.argv[1:] or ['80b37a0', '24e0448']
+refs = sys.argv[1:] or ['80b37a0', '24e0448', '2eda131']
 W = '/tmp/amr_upgrade'; shutil.rmtree(W, ignore_errors=True); os.makedirs(W)
 fails = []; n = [0]
 def check(label, ok, extra=''):
@@ -57,7 +57,7 @@ with sync_playwright() as p:
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.goto(URL, wait_until='networkidle'); pg.wait_for_function('navigator.serviceWorker.controller || false', timeout=15000) if False else None
         pg.wait_for_timeout(1500); pg.reload(wait_until='networkidle'); pg.wait_for_function('!!navigator.serviceWorker.controller', timeout=15000)
-        s0 = state(pg); check(f'{ref}: old release installed + controlling, cache {s0["keys"]}', s0['ctrl'] and s0['keys'] == [f'amr-planner-old{ref}'] and not s0['build'])
+        s0 = state(pg); check(f'{ref}: old release installed + controlling, cache {s0["keys"]}', s0['ctrl'] and s0['keys'] == [f'amr-planner-old{ref}'] and (not s0['build'] or ref == '2eda131'))
         # the user's saved mission in the OLD storage format (flight-plan key f175 in the old releases)
         pg.evaluate("""() => { localStorage.setItem('amr.current.v1', JSON.stringify({ date: '2026-10-29', dep: { id: 'KTUS' }, d1: { id: 'KRYN', wx: 'AWOS' }, d2: { id: 'KDMA' }, f175: { etd: '2145', tas: '105' } })); }""")
         pg.reload(wait_until='networkidle'); pg.wait_for_timeout(800)

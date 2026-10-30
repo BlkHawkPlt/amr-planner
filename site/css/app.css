@@ -87,3 +87,4 @@ details>summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--pri);m
 details.inp>summary.h2{font-size:17px;font-weight:700;color:var(--ink);list-style:none;margin:0;display:flex;justify-content:space-between;align-items:center}details.inp>summary.h2::after{content:"▾";color:var(--pri)}details.inp[open]>summary.h2::after{content:"▴"}details.inp>summary small{font-size:11px;font-weight:400;color:var(--mut)}
 .updbar{position:sticky;top:0;z-index:30;background:#1b5e20;color:#fff;padding:8px 12px;display:flex;gap:10px;align-items:center;justify-content:center;font-size:14px}.updbar[hidden]{display:none}
 .f[hidden]{display:none!important}
+.f label .stsel{float:right;width:auto;min-height:26px;height:26px;padding:0 6px;font-size:12px;text-transform:none;font-weight:600;letter-spacing:0}

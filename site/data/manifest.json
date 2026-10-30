@@ -10,6 +10,11 @@
      "url": "data/2610/AZ.json",
      "airports": 200,
      "pre": true
+    },
+    "PA": {
+     "url": "data/2610/PA.json",
+     "airports": 393,
+     "pre": true
     }
    }
   },
@@ -22,6 +27,11 @@
     "AZ": {
      "url": "data/2611/AZ.json",
      "airports": 200,
+     "pre": true
+    },
+    "PA": {
+     "url": "data/2611/PA.json",
+     "airports": 393,
      "pre": true
     }
    }

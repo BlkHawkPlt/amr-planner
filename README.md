@@ -3,9 +3,9 @@
 Static, offline-capable web app (PWA) for planning instrument training missions: pick date / aircraft (UH-72, UH-60L, UH-60M) / tail number, departure +
 destination 1 + destination 2, runway / approach / SID / STAR / weather per airport, and it produces the **AMR**, the **DD 1801** (DoD International Flight Plan - the flight plan everywhere in the app; ETE/ETD/ETA are the DD 1801 EET numbers) with **DD 1801-C**; the old **DD 175** is only a hidden legacy option (Info > Show legacy DD 175),
 **DD 175-1** and the **Grade Sheet ATC call scripts** (AWOS/ASOS aware, every fillable blank filled from the plan + FAA data). No backend, no accounts; inputs are saved in the browser
-(localStorage) and named missions can be saved/loaded. Arizona is loaded in v1; the data pipeline and loader are built to scale to all states.
+(localStorage) and named missions can be saved/loaded. Arizona and Pennsylvania are loaded (v1.4); the data pipeline and loader are built to scale to all states.
 
-**Live:** https://rcmckaig.github.io/amr-planner/  (open on iPad/iPhone in Safari → Share → *Add to Home Screen*, once, while online)
+**Live:** https://blkhawkplt.github.io/amr-planner/  (open on iPad/iPhone in Safari → Share → *Add to Home Screen*, once, while online)
 
 > Training / planning aid only. Airport, runway, approach, SID/STAR and frequency data come from the FAA NASR 28-day subscription
 > and d-TPP metafile. Verify everything against current FAA / DoD flight publications and NOTAMs before flight.
@@ -51,11 +51,12 @@ Manual refresh: `python3 data/refresh.py --force` (needs network), then `tests/c
 Edit `data/config.json` (`"states": ["AZ","NM"]` or `"ALL"`) and run *Refresh FAA data* with `force`. With `ALL` the build is about
 2 MB raw / 0.46 MB gzip per cycle (59 state/territory files, `XX` = airports with no state code) plus a cross-state search index.
 Only the `preload` states are cached up front for offline use; others are cached when first opened.
-The v1 UI loads one state (`settings.state`, default AZ); a state picker and cross-state search are the next UI step.
+**v1.4:** `states` is a list (`["AZ","PA"]`); the app loads every state shipped in the manifest (about 60 kB gzip for AZ + PA per cycle, all preloaded for offline use), so airport IDs and search work across states
+and one mission can mix states. Each airport card on the Plan has a small "All states / AZ / PA" search filter (default All states; typing an exact ID always works). The full nationwide picker is still to come.
 
 ## Airport filter (`--filter training`, the default)
-Open airports that are public-use, or military/Coast Guard owned, or any heliport (incl. private heliports). Private airstrips,
-ultralight and glider ports are dropped unless public.
+Open airports that are public-use, or military/Coast Guard owned, or any heliport (incl. private heliports). Private airstrips are dropped; ultralight and glider ports are kept only if public;
+seaplane bases (NASR site type C) and balloonports are always dropped (this only started to matter with PA).
 
 ## One source of truth, and updates
 The **Plan** tab is the only place inputs are edited (weather source, approach, runway, SID/STAR, ETD, void/NLT minutes, ...); AMR, DD 1801, 1801-C, 175-1 and the
@@ -89,3 +90,9 @@ facility the script adds a Center step. Known limits: NASR names only one provid
 ## Known gaps (v1)
 DD 1801 is the 1 May 1987 edition (the current DoD file is a dynamic Adobe-only form of the same edition, so the static 2023 copy is filled); military-only (NGA) approaches are not in FAA CIFP so their fix/altitude blanks stay; no state picker yet; sun times (BMNT/EENT) are a NOAA approximation; great-circle distances are hints;
 no NOTAMs or live weather; tested in headless Chromium, not on physical iOS hardware.
+
+## Pennsylvania (v1.4)
+393 facilities per cycle with the same filter as AZ: 108 public airports, 1 public gliderport, 1 public ultralight park, 4 public heliports, 6 military heliports (Muir AHP / Fort Indiantown Gap, Carlisle Barracks,
+Letterkenny, Tobyhanna, Oakdale AHP, North Penn USARC) and 273 private heliports. The first-contact logic is unchanged and data-driven: the provider NASR lists for the airport (Harrisburg, Philadelphia, Pittsburgh,
+Allentown, Wilkes-Barre, Buffalo, ... approach controls or New York / Cleveland / Washington Center), else the direction rule. Center frequencies are the nearest RCAG listed within 100 nm (was 80 nm; AZ is unaffected) -
+beyond that the Center is named without a frequency. NASR has no GCO frequencies for PA either (type it on the Plan). Military-only approaches that are not in the d-TPP / CIFP are not in the app.

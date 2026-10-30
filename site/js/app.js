@@ -6,7 +6,7 @@
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const LS = { cur: 'amr.current.v1', missions: 'amr.missions.v1', settings: 'amr.settings.v1' };
-  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
+  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ', stFilter: 'ALL', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
   const env = { ap: id => D.ap(id), acft: d => D.acft(d), device: d => D.device(d), get compat() { return S.settings.compat; } };
 
   /* ---------- storage ---------- */
@@ -69,7 +69,7 @@
       ${F('Min after dep', inp('dep.min', { attrs: 'inputmode="numeric"', ph: '10' }))}</div>`
       : `<h3>Approach clearance</h3><div class="grid">${F('Clearance type', sel(k + '.ac', M.CLR_TYPES.map(x => [x, x.replace(/\s+/g, ' ')])), 'full')}</div>`;
     return `<section class="card" data-ap="${k}"><h2>${APN[k]}<small id="cnt-${k}"></small></h2>
-      <div class="grid"><div class="f full"><label>Airport (ID, name or city)</label><input data-b="${k}.id" data-pick="${k}" value="${esc(S.m[k].id)}" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="e.g. KTUS, RYN, Tucson"><ul class="sug" hidden></ul></div></div>
+      <div class="grid"><div class="f full"><label>Airport (ID, name or city)${D.states().length > 1 ? `<select class="stsel" aria-label="Search in state" title="Limit the airport search to one state (typing an exact ID always works)">${['ALL'].concat(D.states()).map(x => `<option value="${x}"${(S.settings.stFilter || 'ALL') === x ? ' selected' : ''}>${x === 'ALL' ? 'All states' : x}</option>`).join('')}</select>` : ''}</label><input data-b="${k}.id" data-pick="${k}" value="${esc(S.m[k].id)}" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="e.g. KTUS, KMDT, RYN, Harrisburg"><ul class="sug" hidden></ul></div></div>
       <div class="apinfo" id="info-${k}"></div>${wx}${ops}${ctlSec}${clr}</section>`;
   }
   function planHTML() {
@@ -149,7 +149,7 @@
   function renderInfo(k) {
     const x = S.m[k], a = D.ap(x.id), el = $('#info-' + k), cnt = $('#cnt-' + k);
     if (!a) {
-      el.innerHTML = x.id ? `<span style="color:var(--bad)"><b>${esc(x.id)}</b> not found in the ${S.settings.state} data.</span> Type an FAA/ICAO ID (drop the K only for IDs with numbers - e.g. 02AZ, P08, KTUS).` : 'Pick an airport.';
+      el.innerHTML = x.id ? `<span style="color:var(--bad)"><b>${esc(x.id)}</b> not found in the loaded data (${esc(Object.keys(D.loaded).join(', '))}).</span> Type an FAA/ICAO ID (drop the K only for IDs with numbers - e.g. 02AZ, N95, KTUS, KMDT).` : 'Pick an airport.';
       cnt.textContent = ''; const wh0 = $('#wxh-' + k); if (wh0) wh0.textContent = ''; return;
     }
     cnt.textContent = a.c;
@@ -513,14 +513,14 @@
     const bw = $('#btnWipe'); bw && bw.addEventListener('click', () => { if (confirm('Erase all saved missions and settings on this device?')) { Object.values(LS).forEach(k => localStorage.removeItem(k)); location.reload(); } });
   }
   async function reloadData() {
-    await D.init(S.settings.cycle); await D.loadState(S.settings.state); badge(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
+    await D.init(S.settings.cycle); await D.loadAll(); D.stFilter = S.settings.stFilter || 'ALL'; badge(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
   }
   function badge() {
     const c = D.cycle, st = D.cycleStatus(c), el = $('#cycBadge');
     el.className = 'cyc ' + st.state; el.textContent = `FAA cycle ${c.tpp} • ${st.state === 'current' ? 'eff ' + fmtDate(c.from.slice(0, 10)) + ' – ' + fmtDate(c.to.slice(0, 10)) : st.text}`;
     el.title = `NASR ${c.nasr}; d-TPP ${c.tpp} effective ${c.from} to ${c.to}. Training/planning only - verify against current FAA publications.`;
   }
-  function afterPlan() { wirePickers($('#view-plan')); refreshPlan(); $('#missionLabel').textContent = S.m.name || 'New mission'; }
+  function afterPlan() { wirePickers($('#view-plan')); $$('.stsel', $('#view-plan')).forEach(el => el.addEventListener('change', () => { S.settings.stFilter = D.stFilter = el.value; jset(LS.settings, S.settings); $$('.stsel').forEach(o => { o.value = el.value; }); })); refreshPlan(); $('#missionLabel').textContent = S.m.name || 'New mission'; }
 
   /* ---------- missions modal ---------- */
   const missions = () => jget(LS.missions, {});
@@ -539,9 +539,8 @@
     S.m = merge(M.defaultMission(), migrate(obj)); jset(LS.cur, S.m);
     await ensureStates(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
   }
-  async function ensureStates() {   // lazy-load the state of every airport on the mission (v1: AZ only)
-    for (const k of ['dep', 'd1', 'd2']) { /* all v1 airports are in the single bundled state; hook for per-state lazy loading */ }
-    await D.loadState(S.settings.state);
+  async function ensureStates() {   // make sure all shipped states are loaded
+    await D.loadAll();                                  // v1.4: every shipped state (AZ + PA) is loaded, so a mission can mix states
   }
   function wireModal() {
     const m = $('#modal');
@@ -648,7 +647,7 @@
   async function boot() {
     S.settings = Object.assign(S.settings, jget(LS.settings, {}));
     await D.init(S.settings.cycle);
-    await D.loadState(S.settings.state);
+    await D.loadAll(); D.stFilter = S.settings.stFilter || 'ALL';
     S.m = merge(M.defaultMission(), migrate(jget(LS.cur, null)));
     badge();
     $('#view-plan').innerHTML = planHTML(); afterPlan(); wire();

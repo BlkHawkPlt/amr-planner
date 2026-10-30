@@ -1,7 +1,7 @@
 /* Data layer: FAA cycle selection + lazy per-state airport loading + search. */
 (function (root) {
   'use strict';
-  const D = { manifest: null, cycle: null, loaded: {}, airports: {}, static: null, mode: 'auto' };
+  const D = { manifest: null, cycle: null, loaded: {}, airports: {}, static: null, mode: 'auto', stFilter: 'ALL' };   // stFilter: 'ALL' or a 2-letter state that limits search()
   const KIND = { 'PU-A': 'Public airport', 'PU-G': 'Public gliderport', 'PU-H': 'Public heliport', 'PU-S': 'Public seaplane base',
     'MIL-A': 'Military airport', 'MIL-H': 'Military heliport', 'PR-H': 'Private heliport', 'PR-A': 'Private airport' };
   D.kindLabel = k => KIND[k] || k;
@@ -35,6 +35,10 @@
     for (const id in doc.a) { const a = doc.a[id]; a.id = id; a.st = st; D.airports[id] = a; }
     D.loaded[st] = doc; return doc;
   };
+  D.states = () => Object.keys((D.cycle && D.cycle.states) || {}).sort();                // states shipped in the cycle in use (v1.4: AZ, PA)
+  D.loadAll = async function () {                                                       // load every shipped state (small: ~60 kB gzip for AZ + PA) so IDs and search work across states
+    await Promise.all(D.states().map(st => D.loadState(st))); return D.loaded;
+  };
   D.ap = id => D.airports[String(id || '').trim().toUpperCase()] || null;
   D.acft = d => (D.static.acft.find(a => a.design === d) || null);
   D.device = d => (D.static.devices.find(x => x.device === d) || null);
@@ -47,6 +51,7 @@
     const out = [];
     for (const id in D.airports) {
       const a = D.airports[id], n = a.n.toUpperCase(), c = a.c.toUpperCase(); let sc = 99;
+      if (D.stFilter && D.stFilter !== 'ALL' && a.st !== D.stFilter) continue;
       if (id === q || id === 'K' + q) sc = 0; else if (id.startsWith(q) || ('K' + q.slice(0, 3) === id.slice(0, 4) && id.startsWith('K' + q))) sc = 1;
       else if (n.startsWith(q)) sc = 2; else if (n.includes(q)) sc = 3; else if (c.includes(q)) sc = 4; else continue;
       out.push([sc, id]);

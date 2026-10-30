@@ -18,6 +18,7 @@ ARTCC_CALL = {'ZAB':'ALBUQUERQUE','ZAN':'ANCHORAGE','ZAU':'CHICAGO','ZBW':'BOSTO
 TERM = ('TRACON', 'ATCT-TRACON', 'ATCT-RAPCON', 'ATCT-RATCF', 'ATCT-A/C', 'CERAP')
 NEAR_NM = 15.0       # a facility's area "reaches" an airport when one of the airports it serves is this close
 MAX_ANCHOR_NM = 75.0
+MAX_RCAG_NM = 100.0      # was 80 (AZ unaffected: every AZ airport already had an RCAG within 80 nm); PA needs a little more reach in the Philadelphia area. Farther = no Center frequency (blank) rather than a wrong one
 
 def rd(path): return csv.DictReader(open(path, encoding='utf-8-sig'))
 def fl(x):
@@ -162,7 +163,7 @@ def attach(A, ID, raw, base_rows):
                     dd = nm(me, e['p']); score = (0 if e['sec'] in ('LOW', '') else 1, dd)
                     if best is None or score < best[0]: best = (score, e, dd)
                 zz = {'id': z, 'call': ARTCC_CALL.get(z, z)}
-                if best and best[2] <= 80:
+                if best and best[2] <= MAX_RCAG_NM:
                     zz.update({'f': vhf_first(best[1]['f']), 'via': best[1]['ap'], 'd': round(best[2])})
                 h['z'] = zz
         if h: d['h'] = h

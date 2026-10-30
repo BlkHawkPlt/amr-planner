@@ -5,9 +5,10 @@ const M = require(SITE + '/js/model.js'); require(SITE + '/js/scripts.js'); requ
 const AF = require(SITE + '/js/forms.js');
 const PL = require(SITE + '/vendor/pdf-lib.min.js');
 const fields = JSON.parse(fs.readFileSync(SITE + '/forms/fields.json'));
-function loadEnv(cycle) {
+function loadEnv(cycle, states) {      // states: default ['AZ'] (existing suites); the v1.4 PA suite passes ['AZ','PA']
   cycle = cycle || '2611';
-  const d = JSON.parse(fs.readFileSync(`${SITE}/data/${cycle}/AZ.json`)).a, st = JSON.parse(fs.readFileSync(SITE + '/data/static.json'));
+  const d = {}; (states || ['AZ']).forEach(s => Object.assign(d, JSON.parse(fs.readFileSync(`${SITE}/data/${cycle}/${s}.json`)).a));
+  const st = JSON.parse(fs.readFileSync(SITE + '/data/static.json'));
   return { ap: id => d[id] || null, acft: n => st.acft.find(a => a.design === n) || null, device: n => st.devices.find(x => x.device === n) || null, compat: false, data: d, static: st };
 }
 const blank = k => fs.readFileSync(`${SITE}/forms/${k}.pdf`);

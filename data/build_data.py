@@ -27,7 +27,7 @@ ARTCC = {'ZAB':'ALBUQUERQUE','ZAN':'ANCHORAGE','ZAU':'CHICAGO','ZBW':'BOSTON','Z
  'ZOA':'OAKLAND','ZOB':'CLEVELAND','ZSE':'SEATTLE','ZTL':'ATLANTA','ZUA':'GUAM','ZSU':'SAN JUAN'}
 TERM = ('TRACON','ATCT-TRACON','ATCT-RAPCON','ATCT-RATCF','ATCT-A/C','CERAP','ATCT')
 MIL_OWN = ('MA','MN','MR','MF','CG')
-SITE = {'A':'airport','H':'heliport','G':'gliderport','U':'ultralight','S':'seaplane','B':'balloonport'}
+SITE = {'A':'airport','H':'heliport','G':'gliderport','U':'ultralight','S':'seaplane','C':'seaplane','B':'balloonport'}   # NASR SITE_TYPE_CODE: C = seaplane base
 
 def rd(path):
     return csv.DictReader(open(path, encoding='utf-8-sig'))
@@ -50,6 +50,7 @@ def kind(r):
 def keep(r, flt):
     if r['ARPT_STATUS'] != 'O': return False
     if flt == 'all': return True
+    if r['SITE_TYPE_CODE'] in ('C', 'S', 'B'): return False      # seaplane bases / balloonports are never kept (public ones too)
     k = kind(r)
     return k.startswith('MIL') or k.startswith('PU') or r['SITE_TYPE_CODE'] == 'H'
 
