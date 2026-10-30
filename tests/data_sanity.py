@@ -28,7 +28,11 @@ for c in cycles:
         need(len(a) == ent['airports'], f'{p}: manifest says {ent["airports"]} airports, file has {len(a)}')
         for i, d in a.items():
             if not (d.get('n') and 'e' in d and 'k' in d): need(False, f'{p}: {i} missing n/e/k'); break
+        # v1.5: VFR sectional (NASR APT_BASE.CHART_NAME) per airport - a refresh that loses the field must fail the build
+        need(sum(1 for d in a.values() if d.get('sc')) >= 0.9 * len(a), f'{s} {c["tpp"]}: fewer than 90% of airports carry a sectional (sc)')
+        need(all(d['sc'] == d['sc'].upper() and d['sc'].strip() == d['sc'] for d in a.values() if 'sc' in d), f'{s} {c["tpp"]}: sectional names must be trimmed upper case')
         if s == 'AZ':
+            need(all(a.get(i, {}).get('sc') == 'PHOENIX' for i in ('KRYN', 'KMZJ', 'KTUS', 'KPHX')), f'AZ {c["tpp"]}: KRYN/KMZJ/KTUS/KPHX must be on the PHOENIX sectional')
             need(len(a) >= 150, f'AZ has only {len(a)} airports')
             for i in ('KTUS', 'KPHX', 'KRYN', 'KDMA', 'KFLG'):
                 d = a.get(i); need(d is not None, f'AZ {c["tpp"]}: {i} missing')
@@ -46,6 +50,7 @@ for c in cycles:
             for i, d in a.items():
                 if d.get('w'): need(set(d['w']) <= {'t', 'p', 'p2', 'f'}, f'{i}: unexpected AWOS keys {list(d["w"])}')
         if s == 'PA':
+            need(all(a.get(i, {}).get('sc') == 'NEW YORK' for i in ('KMUI', 'KRDG', 'KLNS')), f'PA {c["tpp"]}: KMUI/KRDG/KLNS must be on the NEW YORK sectional')
             need(len(a) >= 390, f'PA {c["tpp"]} has only {len(a)} airports')
             for i in ('KPIT', 'KPHL', 'KMDT', 'KABE', 'KAVP', 'KERI', 'KTHV', 'KFIG', 'KMUI'):
                 d = a.get(i); need(d is not None, f'PA {c["tpp"]}: {i} missing')

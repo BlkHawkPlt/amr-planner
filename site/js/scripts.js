@@ -34,11 +34,12 @@
     const choice = s(x && x.wx) || 'AUTO', g = (a && a.g) || {}, w = a && a.w;
     const atis = fset(g.I), wk = w ? M.wxKind(w.t) : '';
     let src, auto = choice === 'AUTO', why = '';
-    // an "ATIS" frequency that is the same as the AWOS/ASOS radio frequency is just the automated broadcast
-    const atisIsAuto = w && w.f && atis.all.includes(f2(w.f));
+    // v1.5: if the FAA lists an ATIS / D-ATIS frequency for the airport, ATIS is the default - even when the field also has an ASOS/AWOS (even on the same frequency).
+    // AWOS/ASOS is the default only when the FAA lists no ATIS. The Plan's ATIS/AWOS/ASOS dropdown overrides this.
+    const atisIsAuto = w && w.f && atis.all.includes(f2(w.f));       // the ATIS frequency is also the ASOS/AWOS radio frequency (used only when the user picks ASOS/AWOS by hand)
     if (auto) {
-      if (atis.all.length && !atisIsAuto) { src = 'ATIS'; why = 'ATIS frequency ' + atis.txt + ' in FAA data'; }
-      else if (w) { src = wk; why = (w.t || wk) + ' listed in FAA data' + (atisIsAuto ? ' (its radio broadcast is on ' + w.f + ')' : ''); }
+      if (atis.all.length) { src = 'ATIS'; why = 'ATIS frequency ' + atis.txt + ' in FAA data' + (w ? ' (also has ' + (w.t || wk) + ' - pick it in the list to use one-minute weather)' : ''); }
+      else if (w) { src = wk; why = (w.t || wk) + ' listed in FAA data, no ATIS listed'; }
       else { src = 'ATIS'; why = a ? 'no ATIS or AWOS/ASOS in FAA data - defaulting to ATIS; use the toggle' : 'airport not in data - defaulting to ATIS'; }
     } else { src = choice; why = 'set manually'; }
     const oneMin = src !== 'ATIS';
@@ -188,7 +189,7 @@
     const advD = ctlD.adv.txt ? ctlD.adv.txt : '122.9 (MULTICOM)', spD = spokenName(D, env).bare, spA = spokenName(A, env).bare, spB = spokenName(B, env).bare;
     const courseD = HD.course != null ? HD.course : null, dirD = courseD != null ? M.compass(courseD) : null;
     if (ctlD.towered) {
-      g.taxi = CS + ', RWY ' + val(D.rwy, 'runway') + ', Hover Taxi via ' + BL + 'taxi route' + BE + '.';
+      g.taxi = CS + ', taxi to RWY ' + val(D.rwy, 'runway') + ' via ' + BL + 'taxi route' + BE + '.';       // wheeled aircraft: plain ground taxi clearance (no hover / air taxi)
       hdr.taxi = tD ? fr(tD.G, tD.call + ' Ground') : 'Local / advisory';
       g.takeoff = CS + ', RWY ' + val(D.rwy, 'runway') + ' (MIL ATC: Wind ' + val(D.wind) + ' @ ' + val(D.ws) + ' ) Cleared for Takeoff.';
       hdr.takeoff = tD ? fr(tD.T, tD.name) : 'Local / advisory';
@@ -196,7 +197,7 @@
       hdr.handoff1 = tD ? tD.name : 'Departing facility';
       out.title.taxi = 'Taxi'; out.title.takeoff = 'Takeoff'; out.title.handoff1 = 'Handoff';
     } else {                                                           // uncontrolled: no taxi / takeoff clearance, only advisory calls on the CTAF
-      g.taxi = FV + spD + FE + ' traffic, ' + CS + ', hover taxiing to RWY ' + val(D.rwy, 'runway') + ', ' + FV + spD + FE + ' traffic.';
+      g.taxi = FV + spD + FE + ' traffic, ' + CS + ', taxiing to RWY ' + val(D.rwy, 'runway') + ' via ' + BL + 'taxi route' + BE + ', ' + FV + spD + FE + ' traffic.';
       hdr.taxi = 'CTAF ' + advD + ' - self-announce (no taxi clearance)';
       g.takeoff = FV + spD + FE + ' traffic, ' + CS + ', departing RWY ' + val(D.rwy, 'runway') + (dirD ? ', departing to the ' + FV + dirD + FE : ', departing to the ' + BL + 'direction' + BE) + ', ' + FV + spD + FE + ' traffic.';
       hdr.takeoff = 'CTAF ' + advD + ' - self-announce (no takeoff clearance)';

@@ -91,6 +91,16 @@ facility the script adds a Center step. Known limits: NASR names only one provid
 DD 1801 is the 1 May 1987 edition (the current DoD file is a dynamic Adobe-only form of the same edition, so the static 2023 copy is filled); military-only (NGA) approaches are not in FAA CIFP so their fix/altitude blanks stay; no state picker yet; sun times (BMNT/EENT) are a NOAA approximation; great-circle distances are hints;
 no NOTAMs or live weather; tested in headless Chromium, not on physical iOS hardware.
 
+## VFR sectional (v1.5)
+Each airport carries `sc` = the FAA VFR sectional chart it is on, taken from NASR `APT_BASE.csv` column `CHART_NAME` (e.g. PHOENIX, NEW YORK, WASHINGTON); about 95% of AZ + PA facilities have one.
+`M.sectionals(m, env)` lists the charts for departure, destination 1, destination 2 and the alternate in route order, de-duplicated (`PHOENIX, NEW YORK, WASHINGTON`).
+The AMR "VFR Sectional:" row (Publications, same place as the workbook's AMR!A41) uses that list; the Plan's AMR details field "VFR sectional" is a manual override - blank = auto.
+`refresh.py` SCHEMA 5 forces already-shipped cycles to be rebuilt with the field; `tests/data_sanity.py` fails a refresh that loses it. Tests: `tests/unit_sect.js`, `tests/ci_sect.py`.
+
+## Weather-source default (v1.5)
+If the FAA data lists an ATIS / D-ATIS frequency for an airport the default is ATIS (frequency + info letter), even when the field also lists an ASOS/AWOS - Lancaster (KLNS) and Reading (KRDG) list both on the same frequency and are ATIS.
+ASOS/AWOS is the default only when the FAA lists no ATIS; a field with neither defaults to ATIS. The ATIS/AWOS/ASOS dropdown on every Plan airport card overrides it.
+
 ## Pennsylvania (v1.4)
 393 facilities per cycle with the same filter as AZ: 108 public airports, 1 public gliderport, 1 public ultralight park, 4 public heliports, 6 military heliports (Muir AHP / Fort Indiantown Gap, Carlisle Barracks,
 Letterkenny, Tobyhanna, Oakdale AHP, North Penn USARC) and 273 private heliports. The first-contact logic is unchanged and data-driven: the provider NASR lists for the airport (Harrisburg, Philadelphia, Pittsburgh,

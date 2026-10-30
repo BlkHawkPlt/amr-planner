@@ -89,6 +89,8 @@ def main():
                     e=int(round(float(e))) if e else None,
                     c=f"{r['CITY']}, {r['STATE_CODE']}", k=kind(r), _st=r['STATE_CODE'], _lid=r['ARPT_ID'])
         if lat is not None: A[i]['p'] = [lat, lon]
+        ch = (r.get('CHART_NAME') or '').strip().upper()          # NASR APT_BASE.CHART_NAME = VFR sectional chart the airport is on (v1.5)
+        if ch: A[i]['sc'] = ch
 
     # runway ends (file order preserved, de-duplicated)
     for r in rd(f'{raw}/APT_RWY_END.csv'):

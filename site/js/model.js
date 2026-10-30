@@ -155,6 +155,19 @@
 
   /* Calls sheet + Grade Sheet text now live in scripts.js (M.calls) */
 
+  /* ---------- VFR sectional(s) for the route: FAA NASR APT_BASE.CHART_NAME (airport field 'sc'), de-duplicated in route order ---------- */
+  M.sectionals = function (m, env) {
+    const ids = [m.dep && m.dep.id, m.d1 && m.d1.id, m.d2 && m.d2.id, m.alt2 && m.alt2.id].map(x => s(x).trim()).filter(Boolean);
+    const list = [], missing = [], seen = {};
+    ids.forEach(id => {
+      const a = env.ap(id); if (!a) return;
+      const c = s(a.sc).trim().toUpperCase();
+      if (!c) { if (missing.indexOf(id) < 0) missing.push(id); return; }
+      if (!seen[c]) { seen[c] = 1; list.push(c); }
+    });
+    return { list, text: list.join(', '), missing };
+  };
+
   /* ---------- AMR page ---------- */
   M.amr = function (m, env) {
     const ac = env.acft(m.acft) || {}, A = m.amr, F = m.fp;
@@ -181,7 +194,9 @@
     o.remarks = A.remarks;
     const a1 = env.ap(m.d1.id), a2 = env.ap(m.d2.id), v1 = a1 && a1.v || '', v2 = a2 && a2.v || '';
     o.iap = v1 === v2 ? v1 : v1 + ' , ' + v2;
-    o.ela = A.ela; o.sect = A.sect;
+    o.ela = A.ela;
+    const sc = M.sectionals(m, env); o.sectAuto = sc.text; o.sectList = sc.list; o.sectOverride = s(A.sect).trim() !== '';
+    o.sect = o.sectOverride ? s(A.sect).trim() : sc.text;       // blank override = auto from the route
     o.I1 = I1; o.I2 = I2; o.I3 = I3;
     return o;
   };

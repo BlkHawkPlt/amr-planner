@@ -94,7 +94,7 @@
       ${F('Leg 1 navigation', sel('amr.nav1', M.NAV_LIST))}${F('Leg 2 navigation', sel('amr.nav2', M.NAV_LIST))}
       ${F('Unit / station', inp('amr.unit', { ph: 'e.g. UNIT / KXXX' }), 'span2')}
       ${F('Weight &amp; balance', inp('amr.wb', { ph: 'KTUS / 28 OCT 26' }))}${F('ELA', inp('amr.ela', { ph: 'L-4, L-5' }))}
-      ${F('VFR sectional', inp('amr.sect', { ph: 'PHOENIX' }), 'span2')}</div>
+      ${F('VFR sectional (blank = auto from the route)', inp('amr.sect', { ph: 'auto from the airports above' }), 'span2', '<span class="hint" id="sectHint"></span>')}</div>
       <h3>Crew &amp; passengers</h3><div class="grid g3">
       ${[0, 1, 2].map(i => F(['PC', 'PI', 'IP / other'][i] + ' name', inp(`amr.crew.${i}.name`)) + F('Rank', inp(`amr.crew.${i}.rank`)) + (i === 2 ? F('Org / station', inp('amr.crew.2.org')) : '<div></div>')).join('')}
       ${F('Passenger(s)', inp('amr.pax.name'))}${F('Rank', inp('amr.pax.rank'))}${F('Org', inp('amr.pax.org'))}</div>
@@ -155,7 +155,7 @@
     cnt.textContent = a.c;
     const wx = M.wxSource(x, a), wh = $('#wxh-' + k);
     if (wh) wh.textContent = (wx.auto ? 'Auto: ' : '') + wx.tip + (wx.auto ? ' (' + wx.why + ')' : '');
-    el.innerHTML = `<b>${esc(a.n)}</b> &nbsp;elev <b>${a.e == null ? '?' : a.e} ft</b><div class="chips"><span class="chip k">${esc(D.kindLabel(a.k))}</span><span class="chip">${esc(a.v || 'no SIAP vol')}</span><span class="chip">${(a.r || []).length} rwy ends</span><span class="chip">${(a.i || []).length} approaches</span><span class="chip">${(a.d || []).length} SIDs</span><span class="chip">${(a.s || []).length} STARs</span></div>${a.f ? `<div class="freq">${esc(freqText(a))}</div>` : '<div class="freq">No approach/departure/center frequencies in data.</div>'}`;
+    el.innerHTML = `<b>${esc(a.n)}</b> &nbsp;elev <b>${a.e == null ? '?' : a.e} ft</b><div class="chips"><span class="chip k">${esc(D.kindLabel(a.k))}</span><span class="chip">${esc(a.v || 'no SIAP vol')}</span>${a.sc ? `<span class="chip" title="FAA VFR sectional chart">${esc(a.sc)} sectional</span>` : ''}<span class="chip">${(a.r || []).length} rwy ends</span><span class="chip">${(a.i || []).length} approaches</span><span class="chip">${(a.d || []).length} SIDs</span><span class="chip">${(a.s || []).length} STARs</span></div>${a.f ? `<div class="freq">${esc(freqText(a))}</div>` : '<div class="freq">No approach/departure/center frequencies in data.</div>'}`;
   }
   function renderMsgs(k) {
     const x = S.m[k], a = D.ap(x.id), msgs = M.validateWx(x, a && a.e);
@@ -191,6 +191,10 @@
     const one = (lbl, r) => `<div class="msg ${r.ok ? 'ok' : 'warn'}">${lbl}: ${r.ok ? 'forecast at/above 2000-3 - alternate likely not required' : 'below 2000-3 (' + r.why.join(', ') + ') - alternate required'}</div>`;
     el.innerHTML = one('Destination 1', adv.d1) + one('Destination 2', adv.d2) + (S.m.noAlt && !adv.d1.ok ? '<div class="msg bad">"NO 1st ALT NEEDED" is checked but Destination 1 is below 2000-3 - verify against AR 95-1 / FAA alternate rules.</div>' : '');
   }
+  function renderSect() {
+    const el = $('#sectHint'); if (!el) return; const sc = M.sectionals(S.m, env), ov = String(S.m.amr.sect || '').trim();
+    el.textContent = (sc.text ? 'FAA sectional for this route: ' + sc.text : 'No sectional found for this route in the FAA data') + (sc.missing.length ? ' (no chart listed for ' + sc.missing.join(', ') + ')' : '') + (ov ? ' • the AMR uses your typed entry - clear it to go back to auto' : ' • filled in on the AMR automatically');
+  }
   function renderSerial() {
     const el = $('#serialHint'); if (!el) return; const ser = M.serNum(S.m, env), d = D.device(S.m.device);
     const ac = D.acft(S.m.acft);
@@ -208,7 +212,7 @@
   function refreshPlan(only) {
     const ks = only ? [only] : ['dep', 'd1', 'd2'];
     ks.forEach(k => { fillDyn(k); renderInfo(k); renderMsgs(k); });
-    renderCtl(); renderAlt(); renderSerial(); renderGC(); renderTiming();
+    renderCtl(); renderAlt(); renderSect(); renderSerial(); renderGC(); renderTiming();
   }
 
   /* ---------- picker ---------- */
@@ -238,7 +242,7 @@
     if (getp(path) === id) { if (k !== 'alt2') renderInfo(k); return; }
     setp(path, id); save();
     if (k !== 'alt2') { const x = S.m[k]; x.apr = ''; x.rwy = ''; if (k === 'dep') { x.sid = ''; x.trans = ''; } else x.star = ''; refreshPlan(k); renderGC(); }
-    renderAlt(); renderGC(); if (S.tab !== 'plan') renderView();
+    renderAlt(); renderGC(); renderSect(); if (S.tab !== 'plan') renderView();
   }
 
   /* ---------- generic input handler ---------- */
@@ -258,6 +262,7 @@
     }
     if (path === 'device') { const d = D.device(v.trim()); if (d && D.acft(d.type)) { S.m.acft = d.type; const ae = $('[data-b="acft"]'); if (ae) ae.value = d.type; } renderSerial(); }
     if (path === 'acft') renderSerial();
+    if (path === 'amr.sect') renderSect();
     if (/^(d1|d2)\./.test(path) || path === 'noAlt') renderAlt();
     if (path === 'name') $('#missionLabel').textContent = v || 'New mission';
     if (/^(fp|scriptOpts)\./.test(path)) renderTiming();

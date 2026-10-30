@@ -133,6 +133,7 @@ tot = bad = 0; report = []; known = []
 def explain(name, key, w, a, m):
     etd = m['fp']['etd']
     if key == 'D175.K13': return 'CHAR(174) (registered-mark) is encoded differently by LibreOffice; same glyph in Excel'
+    if key == 'Grade.A10': return 'workbook says "Hover Taxi via"; the app (v1.5) uses the plain ground clearance "taxi to RWY xx via <taxi route>" (wheeled aircraft)'
     if key == 'Grade.N39': return 'workbook typo "Farhenheit" corrected'
     if key == 'Grade.N40': return 'workbook prints the colour device name; the app prints the tail number (v1.3 removed colour labels)'
     if key == 'I1751.Q4' and w == a.rstrip('Z'): return 'app appends the Z shown in the form'

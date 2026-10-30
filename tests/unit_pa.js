@@ -14,6 +14,20 @@ function mission(dep, d1, d2, tweak) {
 const P = (m, e) => { const c = M.calls(m, e || env); c.P = c.plain; return c; };
 const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
 
+// ---- v1.5 weather-source default: ATIS whenever the FAA lists an ATIS / D-ATIS frequency (even if the field also has ASOS/AWOS); ASOS/AWOS only when there is no ATIS
+{
+  const ws = (id, wx) => M.wxSource({ wx: wx || 'AUTO' }, env.ap(id));
+  ok('KLNS (Lancaster) = ATIS 125.675 (it also lists an ASOS on the same frequency)', ws('KLNS').src === 'ATIS' && !ws('KLNS').oneMin && ws('KLNS').freq.v === '125.675' && env.ap('KLNS').w && env.ap('KLNS').w.t === 'ASOS', JSON.stringify(ws('KLNS')));
+  ok('KRDG (Reading) = ATIS 127.10; KMDT / KPHL / KABE / KERI = ATIS', ws('KRDG').src === 'ATIS' && ws('KRDG').freq.v === '127.10' && ['KMDT', 'KPHL', 'KABE', 'KERI', 'KPIT'].every(i => ws(i).src === 'ATIS'));
+  ok('AZ: KTUS / KRYN / KPHX / KDVT / KFLG / KIWA = ATIS', ['KTUS', 'KRYN', 'KPHX', 'KDVT', 'KFLG', 'KIWA'].every(i => ws(i).src === 'ATIS'));
+  ok('every airport whose FAA data lists an ATIS frequency defaults to ATIS (none is left on ASOS/AWOS)', Object.values(env.data).filter(a => a.g && a.g.I && a.g.I.length).every(a => M.wxSource({ wx: 'AUTO' }, a).src === 'ATIS'));
+  ok('every airport with no ATIS but an ASOS/AWOS defaults to that station (no ATIS wording)', Object.values(env.data).filter(a => !(a.g && a.g.I && a.g.I.length) && a.w).every(a => M.wxSource({ wx: 'AUTO' }, a).src !== 'ATIS'));
+  ok('no-ATIS towered fields in the FAA data (KIPT, KMUI) keep their ASOS; KTHV (no tower) ASOS', ['KIPT', 'KMUI', 'KTHV'].every(i => !(env.ap(i).g && env.ap(i).g.I) && ws(i).src === 'ASOS'));
+  ok('manual override still works: KLNS -> ASOS keeps the station phone and uses the one-minute script; ASOS -> ATIS back', ws('KLNS', 'ASOS').oneMin && ws('KLNS', 'ASOS').phone === '717-568-6942' && ws('KLNS', 'ATIS').src === 'ATIS');
+  const mk = wx => { const m = L.sampleMission(env); m.dep.id = 'KRDG'; m.d1.id = 'KLNS'; m.d2.id = 'KMDT'; [m.dep, m.d1, m.d2].forEach(x => { x.apr = ''; x.rwy = ''; x.sid = ''; x.star = ''; x.wx = 'AUTO'; }); m.alt2 = { id: '', time: '' }; if (wx) m.d1.wx = wx; return M.calls(m, env); };
+  let c = mk(); ok('KLNS script (auto): ATIS info letter + 125.675, not an automated-weather broadcast', /Information/.test(c.plain.d1Wx) && !/automated surface/i.test(c.plain.d1Wx) && /125\.675/.test(c.hdr.d1Wx), c.plain.d1Wx + ' | ' + c.hdr.d1Wx);
+  c = mk('ASOS'); ok('KLNS script (dropdown = ASOS): "Lancaster Airport automated surface observation"', /automated surface observation/i.test(c.plain.d1Wx) && !/Information/.test(c.plain.d1Wx), c.plain.d1Wx);
+}
 // ---- data / manifest
 ok('manifest ships AZ + PA in every cycle, preloaded for offline', man.cycles.length >= 1 && man.cycles.every(c => c.states.AZ && c.states.PA && c.states.AZ.pre && c.states.PA.pre));
 ok('both states in config.json', JSON.stringify(JSON.parse(fs.readFileSync(L.SITE + '/../data/config.json')).states) === '["AZ","PA"]');
@@ -40,7 +54,7 @@ ok('both cycles carry PA', Object.keys(env10.data).filter(i => /, PA$/.test(env1
 
 // ---- mission 1: towered KMDT -> uncontrolled KTHV (ASOS) -> towered KPHL
 {
-  const m = mission('KMDT', 'KTHV', 'KPHL'), c = P(m), g = c.P;
+  const m = mission('KMDT', 'KTHV', 'KPHL', m => { m.d2.wx = 'ASOS'; }), c = P(m), g = c.P;
   ok('KMDT departure: ATIS, clearance delivery (Harrisburg Approach), ground, tower', /Information/.test(g.depWx) && /118\.80/.test(c.hdr.depWx) && c.ctl.dep.towered && /Harrisburg Intl Ground - 121\.70/.test(c.hdr.taxi) && /Harrisburg Intl Tower - 124\.80/.test(c.hdr.takeoff) && /Cleared for Takeoff/.test(g.takeoff), JSON.stringify(c.hdr));
   ok('KMDT departs to Harrisburg Departure 118.25', /Contact Harrisburg Departure on 118\.25/.test(g.handoff1) && /Harrisburg Departure/.test(g.depCtl), g.handoff1);
   ok('KTHV weather is ASOS one-minute, no ATIS letter / runway', /^York Airport automated surface observation, \d{4}Z, wind 120 at 10/.test(g.d1Wx) && !/Information/.test(g.d1Wx) && /119\.275/.test(c.hdr.d1Wx), g.d1Wx);
@@ -48,7 +62,7 @@ ok('both cycles carry PA', Object.keys(env10.data).filter(i => /, PA$/.test(env1
   ok('KTHV cancel IFR: advisory frequency + phone to Harrisburg Approach', /CTAF 123\)/.test(g.d1Cancel) && /Harrisburg Approach by phone/.test(g.d1Cancel), g.d1Cancel);
   ok('KTHV -> KPHL: first call after KTHV is Harrisburg Approach 124.10 (provider listed), pilot calls (no tower)', /Harrisburg Approach/.test(c.hdr.d1Info) && /124\.10/.test(c.hdr.d1Info) && /You call/.test(c.hdr.handoff2), c.hdr.handoff2);
   ok('KPHL (Class B, towered): tower calls + Philadelphia Approach 119.75', c.ctl.d2.towered && /PHILADELPHIA TOWER/.test(g.d2Tower) && /Philadelphia Approach - 119\.75/.test(c.hdr.d2Info) && !g.d2Ctaf1, c.hdr.d2Info);
-  ok('KPHL ASOS broadcast with plan time', /^Philadelphia International Airport automated surface observation, \d{4}Z/.test(g.d2Wx), g.d2Wx);
+  ok('KPHL ASOS broadcast with plan time (ASOS picked by hand; its default is ATIS)', /^Philadelphia International Airport automated surface observation, \d{4}Z/.test(g.d2Wx), g.d2Wx);
   const z = /(\d{4})Z/.exec(g.d1Wx)[1]; eq('KTHV broadcast time = ETA from the plan', z, M.hhmm(M.flight(m, env).eta1));
 }
 // ---- mission 2: KPIT -> KFIG (uncontrolled, Center provider) -> KIPT (part-time tower)
@@ -63,7 +77,7 @@ ok('both cycles carry PA', Object.keys(env10.data).filter(i => /, PA$/.test(env1
 {
   const mk = (cdm, dest) => mission('KTHV', dest || 'KPHL', 'KMDT', m => { m.dep.cdm = cdm; });
   const ph = P(mk('PHONE')), g = ph.P;
-  ok('KTHV phone clearance: Harrisburg Approach 800-932-0712, CTAF advisory taxi/takeoff, no taxi/takeoff clearance', ph.title.cd === 'Clearance by phone' && /800-932-0712/.test(ph.hdr.cd) && /^York traffic/.test(g.taxi) && !/Cleared for Takeoff|Hover Taxi/.test(g.taxi + g.takeoff) && /departing to the (east|southeast)/.test(g.takeoff), ph.hdr.cd + ' | ' + g.takeoff);
+  ok('KTHV phone clearance: Harrisburg Approach 800-932-0712, CTAF advisory taxi/takeoff, no taxi/takeoff clearance', ph.title.cd === 'Clearance by phone' && /800-932-0712/.test(ph.hdr.cd) && /^York traffic/.test(g.taxi) && !/Cleared for Takeoff|hover|air ?taxi/i.test(g.taxi + g.takeoff) && /departing to the (east|southeast)/.test(g.takeoff), ph.hdr.cd + ' | ' + g.takeoff);
   ok('KTHV first call after departure: Harrisburg Approach (NASR provider) 124.10', /^Harrisburg Approach, Army Copter 78730, airborne from York/.test(g.handoff1) && /124\.10/.test(g.handoff1), g.handoff1);
   ok('KTHV GCO (none in FAA data): blank + hint', /^On the GCO ______/.test(P(mk('GCO')).P.cd));
   ok('KTHV airborne pickup: no void time, no first call', (() => { const a = P(mk('AIR')); return !/void/i.test(a.P.cd) && a.P.handoff1 === ''; })());

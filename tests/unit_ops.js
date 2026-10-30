@@ -62,7 +62,7 @@ const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
 {
   const m = mission('KRYN', 'KMZJ', 'KTUS', m => { m.d1.apr = ''; });
   const c = P(m), g = c.P;
-  ok('KRYN departure is towered: ATIS/clearance/ground/tower flow unchanged', c.ctl.dep.towered && /Clearance delivery/.test(c.title.cd) && /Ryan Ground/.test(c.hdr.taxi) && /Ryan Tower/.test(c.hdr.takeoff) && /Cleared for Takeoff/.test(g.takeoff) && /Hover Taxi/.test(g.taxi), JSON.stringify(c.title));
+  ok('KRYN departure is towered: ATIS/clearance/ground/tower flow unchanged', c.ctl.dep.towered && /Clearance delivery/.test(c.title.cd) && /Ryan Ground/.test(c.hdr.taxi) && /Ryan Tower/.test(c.hdr.takeoff) && /Cleared for Takeoff/.test(g.takeoff) && /^Army Copter \d+, taxi to RWY \S+ via /.test(g.taxi) && !/hover|air ?taxi/i.test(g.taxi), JSON.stringify(c.title) + g.taxi);
   ok('KRYN weather is ATIS with info letter', /Information/.test(g.depWx) && /133.35/.test(c.hdr.depWx));
   ok('Pinal AWOS broadcast: airport name, automated weather, Zulu time from the plan, no info letter / runway in use', /^Pinal Airpark automated weather, \d{4}Z, wind 120 at 10, visibility /.test(g.d1Wx) && !/Information|info letter/i.test(g.d1Wx) && /altimeter 29\.94/.test(g.d1Wx), g.d1Wx);
   ok('AWOS broadcast notes the repeat after the altimeter, with no RWY in use', /altimeter 29\.94\.\s+\(repeats/.test(g.d1Wx) && !/Runway|RWY/.test(g.d1Wx));
@@ -80,7 +80,7 @@ const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
   const ph = P(mk('PHONE')), g = ph.P;
   ok('uncontrolled departure: title = clearance by phone, phone from FAA data', ph.title.cd === 'Clearance by phone' && /520-829-6121/.test(ph.hdr.cd) && /Tucson Approach/.test(ph.hdr.cd) && /^Call Tucson Approach on 520-829-6121/.test(g.cd), ph.hdr.cd + ' | ' + g.cd);
   ok('phone clearance text carries void time / NLT / squawk / freq', /Clearance void if not off by/.test(g.cd) && /Squawk/.test(g.cd) && /Departure frequency 119\.40/.test(g.cd), g.cd);
-  ok('no taxi / takeoff clearance: CTAF advisory calls only', /^Pinal Airpark traffic/.test(g.taxi) && /^Pinal Airpark traffic/.test(g.takeoff) && !/Cleared for Takeoff|Hover Taxi/.test(g.taxi + g.takeoff) && /no taxi clearance/.test(ph.hdr.taxi) && /no takeoff clearance/.test(ph.hdr.takeoff) && /123\.05/.test(ph.hdr.taxi), g.taxi + ' / ' + g.takeoff);
+  ok('no taxi / takeoff clearance: CTAF advisory calls only', /^Pinal Airpark traffic/.test(g.taxi) && /^Pinal Airpark traffic/.test(g.takeoff) && !/Cleared for Takeoff|hover|air ?taxi/i.test(g.taxi + g.takeoff) && /taxiing to RWY \S+ via /.test(g.taxi) && /no taxi clearance/.test(ph.hdr.taxi) && /no takeoff clearance/.test(ph.hdr.takeoff) && /123\.05/.test(ph.hdr.taxi), g.taxi + ' / ' + g.takeoff);
   ok('takeoff advisory announces the departure direction toward the next point (southeast)', /departing to the southeast/.test(g.takeoff), g.takeoff);
   ok('first call after departure is made by the pilot to Tucson Approach', /^Tucson Approach, Army Copter 78730, airborne from Pinal Airpark/.test(g.handoff1) && /you call Tucson Approach/i.test(ph.hdr.handoff1), g.handoff1);
   ok('phone override replaces the FAA number', /555-0100/.test(P(mk('PHONE', m => { m.dep.cdPh = '555-0100'; })).P.cd));
