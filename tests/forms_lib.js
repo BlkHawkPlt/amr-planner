@@ -5,8 +5,16 @@ const M = require(SITE + '/js/model.js'); require(SITE + '/js/scripts.js'); requ
 const AF = require(SITE + '/js/forms.js');
 const PL = require(SITE + '/vendor/pdf-lib.min.js');
 const fields = JSON.parse(fs.readFileSync(SITE + '/forms/fields.json'));
+// Cycles come from the shipped manifest (never hard-coded): the daily refresh drops the expired cycle, so there can be one or two.
+const MAN = JSON.parse(fs.readFileSync(SITE + '/data/manifest.json'));
+function pickCycle(which) {
+  const now = new Date(), cs = MAN.cycles.map(c => c.tpp), cur = (MAN.cycles.find(c => now >= new Date(c.from) && now < new Date(c.to)) || MAN.cycles[MAN.cycles.length - 1]).tpp;
+  if (!which || which === 'current') return cur;
+  if (which === 'other') return cs.find(t => t !== cur) || cur;       // the other shipped cycle (same one if only one is shipped)
+  return which;
+}
 function loadEnv(cycle, states) {      // states: default ['AZ'] (existing suites); the v1.4 PA suite passes ['AZ','PA']
-  cycle = cycle || '2611';
+  cycle = pickCycle(cycle);
   const d = {}; (states || ['AZ']).forEach(s => Object.assign(d, JSON.parse(fs.readFileSync(`${SITE}/data/${cycle}/${s}.json`)).a));
   const st = JSON.parse(fs.readFileSync(SITE + '/data/static.json'));
   return { ap: id => d[id] || null, acft: n => st.acft.find(a => a.design === n) || null, device: n => st.devices.find(x => x.device === n) || null, compat: false, data: d, static: st };

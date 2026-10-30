@@ -3,7 +3,7 @@ const fs = require('fs'), L = require('./forms_lib.js'), M = L.M;
 let n = 0, f = 0;
 const ok = (l, c, x) => { n++; if (!c) { f++; console.log('FAIL', l, x === undefined ? '' : String(x).slice(0, 400)); } };
 const eq = (l, a, b) => ok(l, JSON.stringify(a) === JSON.stringify(b), JSON.stringify(a) + ' != ' + JSON.stringify(b));
-const env = L.loadEnv('2611', ['AZ', 'PA']), env10 = L.loadEnv('2610', ['AZ', 'PA']);
+const env = L.loadEnv('current', ['AZ', 'PA']), env10 = L.loadEnv('other', ['AZ', 'PA']);
 const man = JSON.parse(fs.readFileSync(L.SITE + '/data/manifest.json'));
 const PA = Object.values(env.data).filter(a => /, PA$/.test(a.c)), AZ = Object.values(env.data).filter(a => /, AZ$/.test(a.c));
 function mission(dep, d1, d2, tweak) {
@@ -15,7 +15,7 @@ const P = (m, e) => { const c = M.calls(m, e || env); c.P = c.plain; return c; }
 const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
 
 // ---- data / manifest
-ok('manifest ships AZ + PA in both cycles, preloaded for offline', man.cycles.length === 2 && man.cycles.every(c => c.states.AZ && c.states.PA && c.states.AZ.pre && c.states.PA.pre));
+ok('manifest ships AZ + PA in every cycle, preloaded for offline', man.cycles.length >= 1 && man.cycles.every(c => c.states.AZ && c.states.PA && c.states.AZ.pre && c.states.PA.pre));
 ok('both states in config.json', JSON.stringify(JSON.parse(fs.readFileSync(L.SITE + '/../data/config.json')).states) === '["AZ","PA"]');
 eq('AZ unchanged: 200 facilities', AZ.length, 200);
 ok('PA has 390+ facilities', PA.length >= 390 && PA.length < 420, PA.length);

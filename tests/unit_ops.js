@@ -4,7 +4,7 @@ const L = require('./forms_lib.js'), M = L.M;
 let n = 0, f = 0;
 const ok = (l, c, x) => { n++; if (!c) { f++; console.log('FAIL', l, x === undefined ? '' : String(x).slice(0, 400)); } };
 const eq = (l, a, b) => ok(l, JSON.stringify(a) === JSON.stringify(b), JSON.stringify(a) + ' != ' + JSON.stringify(b));
-const env = L.loadEnv('2611'), env10 = L.loadEnv('2610');
+const env = L.loadEnv(), env10 = L.loadEnv('other');
 function mission(dep, d1, d2, tweak) {
   const m = L.sampleMission(env); m.dep.id = dep; m.d1.id = d1; m.d2.id = d2;
   [m.dep, m.d1, m.d2].forEach(x => { x.apr = ''; x.rwy = ''; x.sid = ''; x.trans = ''; x.star = ''; x.wx = 'AUTO'; });
