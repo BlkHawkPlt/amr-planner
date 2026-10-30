@@ -5,11 +5,11 @@ For each old release (git ref): serve it (with GitHub-Pages-like Cache-Control: 
 the deploy does) and let the browser do its update check. Asserts: the open page switches to the new build by itself, old caches are gone, the
 saved mission survived, the new build serves the Plan->Scripts AWOS path. Then: a second upgrade (new -> newer) through the
 'Update available' banner when the service worker can't update, and through 'Force refresh app files'.
-   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1) 2eda131 (v1.3)"""
+   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1) 2eda131 (v1.3) eeb3041 (v1.4)"""
 import sys, os, subprocess, shutil, threading, json, http.server, functools
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-refs = sys.argv[1:] or ['80b37a0', '24e0448', '2eda131']
+refs = sys.argv[1:] or ['80b37a0', '24e0448', '2eda131', 'eeb3041']
 W = '/tmp/amr_upgrade'; shutil.rmtree(W, ignore_errors=True); os.makedirs(W)
 fails = []; n = [0]
 def check(label, ok, extra=''):
