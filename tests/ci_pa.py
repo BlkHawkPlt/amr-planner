@@ -5,6 +5,7 @@ import sys, os, json
 sys.argv_orig = list(sys.argv)
 args = [a for a in sys.argv[1:] if a.startswith('http')]
 SHOTS = sys.argv[sys.argv.index('--shots') + 1] if '--shots' in sys.argv else None
+PRESET = "if(!localStorage.getItem('amr.settings.v1')&&!localStorage.getItem('amr.current.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true}))"   # v1.6: first run asks for states; the AZ/PA suites start with them chosen
 BASE = (args[0] if args else 'http://localhost:8765/').rstrip('/') + '/'
 sys.argv = ['x', BASE]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,10 +41,10 @@ def pdf_texts(pg):
 with sync_playwright() as p:
     b = p.chromium.launch(channel='chrome', args=['--no-sandbox']) if os.environ.get('PW_CHANNEL', 'chrome') == 'chrome' else p.chromium.launch(args=['--no-sandbox'])
     for tag, kw in VIEWS.items():
-        ctx = b.new_context(**kw); pg = ctx.new_page(); pg.set_default_timeout(15000); errs = []; reqs = []
+        ctx = b.new_context(**kw); ctx.add_init_script(PRESET); pg = ctx.new_page(); pg.set_default_timeout(15000); errs = []; reqs = []
         pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('response', lambda r: reqs.append((r.url, r.status)))
         pg.goto(BASE, wait_until='networkidle'); pg.wait_for_function('window.__amr && __amr.S && __amr.S.m'); pg.evaluate('localStorage.clear()'); pg.reload(wait_until='networkidle'); pg.wait_for_function('window.__amr && __amr.S && __amr.S.m')
-        check(f'[{tag}] default mission is still the AZ default (02AZ -> ...)', pg.evaluate('__amr.S.m.dep.id') == '02AZ', pg.evaluate('__amr.S.m.dep.id'))
+        check(f'[{tag}] default mission is the AZ default (KPHX -> KTUS -> KRYN)', pg.evaluate('__amr.S.m.dep.id') == 'KPHX', pg.evaluate('__amr.S.m.dep.id'))
         loaded = pg.evaluate('Object.keys(__amr.D.loaded)'); check(f'[{tag}] AZ and PA are both loaded ({loaded})', sorted(loaded) == ['AZ', 'PA'])
         check(f'[{tag}] PA.json fetched OK', any(u.endswith('/PA.json') and s == 200 for u, s in reqs), str([r for r in reqs if 'data' in r[0]]))
         E.go_plan(pg)

@@ -87,7 +87,7 @@ def main():
         except Exception: lat = lon = None
         A[i] = dict(n=f"{r['ARPT_NAME'].strip()}({r['ARPT_ID']})",
                     e=int(round(float(e))) if e else None,
-                    c=f"{r['CITY']}, {r['STATE_CODE']}", k=kind(r), _st=r['STATE_CODE'], _lid=r['ARPT_ID'])
+                    c=f"{r['CITY']}, {r['STATE_CODE']}", k=kind(r), _st=r['STATE_CODE'], _lid=r['ARPT_ID'], _cc=r.get('COUNTRY_CODE', ''))
         if lat is not None: A[i]['p'] = [lat, lon]
         ch = (r.get('CHART_NAME') or '').strip().upper()          # NASR APT_BASE.CHART_NAME = VFR sectional chart the airport is on (v1.5)
         if ch: A[i]['sc'] = ch
@@ -126,6 +126,17 @@ def main():
                         nm = re.sub(r',\s*CONT\.?\s*\d*$', '', rec.find('chart_name').text.strip())
                         L = A[i].setdefault(k, [])
                         if nm not in L: L.append(nm)
+    # textual Obstacle Departure Procedures ('T' section of the d-TPP): o = ['Rwy 25, climb on heading 250° to 1800, then proceed on course.', ...]
+    tdir = f'{raw}/to'
+    if os.path.isdir(tdir):
+        import odp
+        nodp = 0
+        for fn in sorted(os.listdir(tdir)):
+            if not fn.endswith('.txt'): continue
+            for (st, ident), lines in odp.parse_volume(open(f'{tdir}/{fn}', encoding='utf-8').read()).items():
+                cand = [i for i in ([ident] if ident in A else []) + [x for (s2, x) in LID2ID.get(ident, [])] if A[i]['_st'] == st]
+                if cand and 'o' not in A[cand[0]]: A[cand[0]]['o'] = [l[:420] for l in lines[:8]]; nodp += 1
+        print('textual ODPs attached:', nodp)
     for i, d in A.items():           # airports with no charts inherit the state's most common volume
         if 'v' not in d and vols[d['_st']]: d['v'] = vols[d['_st']].most_common(1)[0][0]
 
@@ -243,16 +254,53 @@ def main():
     if a.cifp and os.path.exists(a.cifp):
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import cifp as C
         na, nm, nt = C.attach(A, C.parse(a.cifp)); print(f'CIFP: procedure details for {nm} of {nt} approaches at {na} airports')
+    # IFR Enroute Low charts covering each airport (el = ['L-4', 'L-5', ...], most interior chart first): point-in-polygon on the FAA chart footprints
+    elp = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'enroute_low.json')
+    if os.path.exists(elp):
+        import math
+        charts = json.load(open(elp))['charts']
+        polys = []
+        for lab, panels in charts.items():
+            for pn in panels:
+                r = pn['ring']; xs = [q[0] for q in r]; ys = [q[1] for q in r]
+                polys.append((lab, r, min(xs), max(xs), min(ys), max(ys)))
+        def inside(lon, lat, r):
+            c = False
+            for k in range(len(r) - 1):
+                (x1, y1), (x2, y2) = r[k], r[k + 1]
+                if (y1 > lat) != (y2 > lat) and lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1: c = not c
+            return c
+        def edge(lon, lat, r):
+            k0 = math.cos(math.radians(lat)); best = 1e9
+            for k in range(len(r) - 1):
+                (x1, y1), (x2, y2) = r[k], r[k + 1]
+                ax, ay, bx, by_ = (x1 - lon) * k0, y1 - lat, (x2 - lon) * k0, y2 - lat
+                dx, dy = bx - ax, by_ - ay; L2 = dx * dx + dy * dy
+                t = 0 if L2 == 0 else max(0, min(1, -(ax * dx + ay * dy) / L2))
+                best = min(best, math.hypot(ax + t * dx, ay + t * dy))
+            return best
+        nel = 0
+        for i, d in A.items():
+            if 'p' not in d: continue
+            lat, lon = d['p']; hit = {}
+            for lab, r, x0, x1, y0, y1 in polys:
+                if x0 <= lon <= x1 and y0 <= lat <= y1 and inside(lon, lat, r): hit[lab] = max(hit.get(lab, 0), edge(lon, lat, r))
+            if hit: d['el'] = [k for k, _ in sorted(hit.items(), key=lambda kv: -kv[1])]; nel += 1
+        print(f'ELA: {nel} of {len(A)} airports are inside an IFR Enroute Low chart footprint')
     # write per-state files
     cyc_info = dict(tpp=cyc, nasr=nasr_date, from_=tfrom, to=tto)
     cyc_info = {'tpp': cyc, 'nasr': nasr_date, 'from': tfrom, 'to': tto}
     by = collections.defaultdict(dict)
     for i, d in A.items():
-        st = d.pop('_st') or 'XX'; d.pop('_lid')   # XX = no state code (Marshall Is., Palau, foreign border strips...)
+        st = d.pop('_st'); d.pop('_lid'); cc = d.pop('_cc')
+        # file grouping (v1.6): NASR has no state code for a few US-affiliated places and for foreign / freely-associated fields
+        if not st and cc == 'PR': st = 'PR'; d['c'] = (d['c'].rstrip(', ') + ', PR')          # Puerto Rico records that lack the state code
+        elif st in ('QM', 'QW'): st = 'UM'                                                    # Midway, Wake -> US Minor Outlying Islands
+        st = st or 'XX'                                                                       # XX = FAA-listed fields with no US state (Marshall Is., Micronesia, Palau, Canada/Bahamas border fields ...)
         d['c'] = d['c'].rstrip(', ')
         by[st][i] = dict(sorted(d.items()))
     sizes = {}
-    index = []
+    ids = {}
     for st, ap_ in sorted(by.items()):
         ap_ = dict(sorted(ap_.items()))
         doc = {'state': st, 'cycle': cyc_info, 'filter': a.filter, 'count': len(ap_), 'a': ap_}
@@ -260,14 +308,16 @@ def main():
         s = json.dumps(doc, separators=(',', ':'), ensure_ascii=False)
         open(p, 'w', encoding='utf-8').write(s)
         sizes[st] = (len(s.encode()), len(gzip.compress(s.encode(), 9)), len(ap_))
-        for i, d in ap_.items(): index.append([i, d['n'], d['c'], d.get('p', [None, None])[0], d.get('p', [None, None])[1]])
+        ids[st] = list(ap_)
     man = {'cycle': cyc_info, 'filter': a.filter, 'states': {k: dict(airports=v[2], bytes=v[0], gzip=v[1]) for k, v in sizes.items()}}
     json.dump(man, open(os.path.join(a.out, 'manifest.json'), 'w'), indent=1)
-    s = json.dumps(index, separators=(',', ':'), ensure_ascii=False)
-    open(os.path.join(a.out, 'index.json'), 'w', encoding='utf-8').write(s)
+    s = json.dumps(ids, separators=(',', ':'), ensure_ascii=False)       # ids.json = {state: [airport ids]}: the small nationwide ID -> state index the app uses to lazy-load a state
+    open(os.path.join(a.out, 'ids.json'), 'w', encoding='utf-8').write(s)
+    idz = len(gzip.compress(s.encode(), 9))
+    man['ids'] = dict(bytes=len(s.encode()), gzip=idz); json.dump(man, open(os.path.join(a.out, 'manifest.json'), 'w'), indent=1)
     tot = sum(v[0] for v in sizes.values()); totz = sum(v[1] for v in sizes.values())
     print(f'cycle {cyc} (NASR {nasr_date}) {tfrom} -> {tto}')
-    print(f'{len(A)} airports in {len(by)} state files; raw {tot/1e6:.2f} MB, gzip {totz/1e6:.2f} MB; index.json {len(s)/1e6:.2f} MB')
+    print(f'{len(A)} airports in {len(by)} state files; raw {tot/1e6:.2f} MB, gzip {totz/1e6:.2f} MB; ids.json {len(s)/1e3:.0f} kB raw, {idz/1e3:.0f} kB gzip')
     if len(sizes) <= 5:
         for st, v in sizes.items(): print(f'  {st}: {v[2]} airports, {v[0]/1e3:.0f} kB raw, {v[1]/1e3:.0f} kB gz')
 

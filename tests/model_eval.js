@@ -13,7 +13,7 @@ for (const [name, m] of Object.entries(sc)) {
     'CS.C5': g.simTemp,
     'Calls.B4': c.depWx.ATIS, 'Calls.B5': c.depWx.ASOS, 'Calls.B6': c.depWx.AWOS, 'Calls.D4': c.depCd.ATC, 'Calls.D5': c.depCd.RELAY,
     'Calls.F4': c.d1Wx.ATIS, 'Calls.F5': c.d1Wx.ASOS, 'Calls.F6': c.d1Wx.AWOS, 'Calls.J4': c.d2Wx.ATIS, 'Calls.J5': c.d2Wx.ASOS, 'Calls.J6': c.d2Wx.AWOS,
-    'AMR.A4': a.mission, 'AMR.A7': a.special, 'AMR.C13': a.design, 'AMR.C14': a.serial, 'AMR.C15': +a.gw, 'AMR.C16': a.fuel, 'AMR.C21': a.hover, 'AMR.C22': a.climb, 'AMR.C23': a.cruise, 'AMR.C24': a.burn, 'AMR.C42': a.iap,
+    'AMR.A4': a.mission, 'AMR.A7': a.special, 'AMR.C13': a.design, 'AMR.C14': a.serial, 'AMR.C15': +a.gw, 'AMR.C16': a.fuel, 'AMR.C21': a.hover, 'AMR.C22': a.climb, 'AMR.C23': a.cruise, 'AMR.C24': a.burn, 'AMR.C42': a.iapLegacy,
     'D175.P2': d.callsign, 'D175.R2': d.design, 'D175.C5': d.leg1.tas, 'D175.C6': d.leg2.tas, 'D175.G12': d.leg1.etd, 'D175.G14': d.leg2.etd, 'D175.S12': d.leg1.ete, 'D175.S14': d.leg2.ete,
     'D175.K12': d.leg1.route, 'D175.K13': d.mid.k, 'D175.L13': d.mid.l, 'D175.A15': d.remarksLine, 'D175.Q16': d.fuel[0], 'D175.R16': d.fuel[1], 'D175.S16': d.fuel[2], 'D175.B18': d.alt, 'D175.E18': d.eteAlt, 'D175.J18': d.weather, 'D175.N18': d.serialUnit,
     'D175.P14': d.leg2.remarks,

@@ -39,6 +39,13 @@ def main():
         print("fetched", k, [n for n in names])
     if a.from_local: shutil.copy(os.path.join(a.from_local, "dtpp.xml"), out)
     else: open(os.path.join(out, "dtpp.xml"), "wb").write(get(f"https://aeronav.faa.gov/d-tpp/{a.tpp}/xml_data/d-TPP_Metafile.xml"))
+    try:                                   # textual Obstacle Departure Procedures (d-TPP 'T' section PDFs -> text); optional
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import odp
+        if a.from_local:
+            src = os.path.join(a.from_local, "to")
+            if os.path.isdir(src): shutil.copytree(src, os.path.join(out, "to"), dirs_exist_ok=True)
+        else: odp.fetch_all(os.path.join(out, "dtpp.xml"), os.path.join(out, "to"), a.tpp)
+    except Exception as e: print("T-section ODP text not available (" + str(e) + ") - continuing without it")
     try:                                   # FAA CIFP (ARINC 424): approach fixes / altitudes / missed approaches (optional)
         cd = f"{d.year % 100:02d}{d.month:02d}{d.day:02d}"
         if a.from_local:

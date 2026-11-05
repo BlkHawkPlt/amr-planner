@@ -6,6 +6,7 @@ effective today, data files load, KTUS -> KRYN -> KDMA picks fill dropdowns, AMR
 import sys, json, os, re, datetime, urllib.request
 from playwright.sync_api import sync_playwright
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
+PRESET = "if(!localStorage.getItem('amr.settings.v1')&&!localStorage.getItem('amr.current.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true}))"   # v1.6: first run asks for states; the AZ/PA suites start with them chosen
 BASE = (args[0] if args else 'http://localhost:8765/').rstrip('/') + '/'
 SHOTS = sys.argv[sys.argv.index('--shots') + 1] if '--shots' in sys.argv else None
 TAG = 'iphone'
@@ -81,7 +82,7 @@ def suite(pg, TAG):
 with sync_playwright() as p:
     try: b = p.chromium.launch(args=['--no-sandbox'])
     except Exception: b = p.chromium.launch(channel='chrome', args=['--no-sandbox'])
-    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True, is_mobile=True, service_workers='allow')
+    ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True, is_mobile=True, service_workers='allow'); ctx.add_init_script(PRESET)
     pg = ctx.new_page(); errs = []; reqs = {}
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
     pg.on('response', lambda r: reqs.__setitem__(r.url, r.status))
@@ -120,7 +121,7 @@ with sync_playwright() as p:
     ctx.set_offline(False); errs[n_on:] = [e for e in errs[n_on:] if 'ERR_FAILED' not in e and 'ERR_INTERNET_DISCONNECTED' not in e]
     check('no console/page errors', not errs, str(errs[:3]))
     # ---- iPad (portrait) pass over the same tabs
-    c2 = b.new_context(viewport={'width': 820, 'height': 1180}, device_scale_factor=2, has_touch=True, is_mobile=True)
+    c2 = b.new_context(viewport={'width': 820, 'height': 1180}, device_scale_factor=2, has_touch=True, is_mobile=True); c2.add_init_script(PRESET)
     p2 = c2.new_page(); e2 = []
     p2.on('pageerror', lambda e: e2.append(str(e))); p2.on('console', lambda m: e2.append(m.text) if m.type == 'error' else None)
     p2.goto(BASE); p2.wait_for_selector('body[data-ready="1"]', timeout=20000)

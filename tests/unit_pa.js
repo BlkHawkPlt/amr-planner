@@ -29,8 +29,8 @@ const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
   c = mk('ASOS'); ok('KLNS script (dropdown = ASOS): "Lancaster Airport automated surface observation"', /automated surface observation/i.test(c.plain.d1Wx) && !/Information/.test(c.plain.d1Wx), c.plain.d1Wx);
 }
 // ---- data / manifest
-ok('manifest ships AZ + PA in every cycle, preloaded for offline', man.cycles.length >= 1 && man.cycles.every(c => c.states.AZ && c.states.PA && c.states.AZ.pre && c.states.PA.pre));
-ok('both states in config.json', JSON.stringify(JSON.parse(fs.readFileSync(L.SITE + '/../data/config.json')).states) === '["AZ","PA"]');
+ok('manifest ships AZ + PA in every cycle (v1.6: downloaded on demand, pre:false) with the nationwide ID index', man.cycles.length >= 1 && man.cycles.every(c => c.states.AZ && c.states.PA && c.states.AZ.pre === false && c.states.PA.pre === false && /ids\.json$/.test(c.index)));
+ok('config.json builds every state (v1.6)', JSON.parse(fs.readFileSync(L.SITE + '/../data/config.json')).states === 'ALL');
 eq('AZ unchanged: 200 facilities', AZ.length, 200);
 ok('PA has 390+ facilities', PA.length >= 390 && PA.length < 420, PA.length);
 ok('no airport id collides across states', Object.keys(env.data).length === AZ.length + PA.length);

@@ -3,7 +3,7 @@
  *   2. the new cache is filled with cache:'reload' requests (GitHub Pages sends max-age=600, so a plain fetch could copy STALE files from the browser's HTTP cache into the new cache);
  *   3. when a new worker takes over from an older release it reloads every open window, so an app left open (or installed on the home screen) switches to the new version by itself.
  * version.json is never cached: the page compares it with its own build to show "Update available". States with "pre": false in data/manifest.json are cached only when first opened. */
-const CACHE = 'amr-planner-v1.5.0';
+const CACHE = 'amr-planner-v1.6.0';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/version.js', 'js/model.js', 'js/ops.js', 'js/scripts.js', 'js/dd1801.js', 'js/forms.js', 'js/data.js', 'js/app.js',
   'vendor/pdf-lib.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'forms/fields.json', 'forms/dd1801.pdf', 'forms/dd1801c.pdf', 'forms/dd175.pdf', 'forms/dd175-1.pdf',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.png', 'data/manifest.json', 'data/static.json'];
@@ -14,7 +14,11 @@ self.addEventListener('install', e => {
     await c.addAll(SHELL.map(fresh));
     try {                                   // precache every data file listed in the manifest
       const man = await (await fetch('data/manifest.json', { cache: 'reload' })).json();
-      const urls = []; man.cycles.forEach(cy => Object.values(cy.states).forEach(s => { if (s.pre !== false) urls.push(s.url); }));
+      const urls = []; man.cycles.forEach(cy => { if (cy.index) urls.push(cy.index); Object.values(cy.states).forEach(s => { if (s.pre !== false) urls.push(s.url); }); });
+      // states the user already has offline in an older release's cache (v1.5: AZ + PA; v1.6: the ticked states) are carried over, in the new cycles' files
+      const have = new Set();
+      for (const k of await caches.keys()) if (k !== CACHE && k.startsWith('amr-planner-')) for (const rq of await (await caches.open(k)).keys()) { const m = /\/data\/\d+\/([A-Z]{2})\.json$/.exec(rq.url); if (m) have.add(m[1]); }
+      man.cycles.forEach(cy => have.forEach(st => { if (cy.states[st] && urls.indexOf(cy.states[st].url) < 0) urls.push(cy.states[st].url); }));
       await c.addAll(urls.map(fresh));
     } catch (err) { /* data will be cached on first use */ }
     self.skipWaiting();

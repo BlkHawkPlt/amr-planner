@@ -6,6 +6,7 @@ Plan input is covered (so a new input cannot be added without a test) and that S
 import sys, json
 from playwright.sync_api import sync_playwright
 args = [a for a in sys.argv[1:] if a.startswith('http')]
+PRESET = "if(!localStorage.getItem('amr.settings.v1')&&!localStorage.getItem('amr.current.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true}))"   # v1.6: first run asks for states; the AZ/PA suites start with them chosen
 BASE = (args[0] if args else 'http://localhost:8765/').rstrip('/') + '/'
 fails = []; n = [0]
 def check(label, ok, extra=''):
@@ -79,6 +80,7 @@ EXPECT = {
   'amr.crew.2.org': ['amr'],
   'amr.crew.2.rank': ['amr'],
   'amr.ela': ['amr'],
+  'amr.iap': ['amr'],
   'amr.intent': ['amr'],
   'amr.missionTxt': ['amr'],
   'amr.nav1': ['amr'],
@@ -218,7 +220,7 @@ def run_case(pg, path, base):
 def main(shard, nshard):
     with sync_playwright() as p:
         b = p.chromium.launch(channel='chrome', args=['--no-sandbox'])
-        ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True, is_mobile=True)
+        ctx = b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True, is_mobile=True); ctx.add_init_script(PRESET)
         pg = ctx.new_page(); pg.set_default_timeout(8000); errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         base, paths = run(pg)

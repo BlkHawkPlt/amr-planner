@@ -13,7 +13,7 @@ on:
         type: boolean
         default: false
       states:
-        description: 'Override states, e.g. AZ,NM or ALL (default: data/config.json)'
+        description: 'Override states, e.g. AZ,NM (default: data/config.json = ALL, every state + territory)'
         type: string
         default: ''
 
@@ -27,6 +27,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 120          # all states: download + build takes well under an hour; free-plan jobs may run up to 6 h
     outputs:
       committed: ${{ steps.commit.outputs.committed }}
     steps:
@@ -36,6 +37,8 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
+      - name: Install poppler (pdftotext reads the d-TPP textual obstacle departure procedures)
+        run: command -v pdftotext >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils)
       - name: Check FAA for a new cycle and rebuild
         id: refresh
         env:

@@ -6,7 +6,7 @@
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const LS = { cur: 'amr.current.v1', missions: 'amr.missions.v1', settings: 'amr.settings.v1' };
-  const S = { m: null, settings: { cycle: 'auto', compat: false, state: 'AZ', stFilter: 'ALL', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
+  const S = { m: null, settings: { cycle: 'auto', compat: false, states: null, welcomed: true, stFilter: 'ALL', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
   const env = { ap: id => D.ap(id), acft: d => D.acft(d), device: d => D.device(d), get compat() { return S.settings.compat; } };
 
   /* ---------- storage ---------- */
@@ -52,7 +52,7 @@
     const ops = `<h3>Procedures</h3><div class="grid g2">
       ${F('Approach in use', `<select data-b="${k}.apr" data-dyn="apr"></select>`)}
       ${F('Runway in use', `<select data-b="${k}.rwy" data-dyn="rwy"></select>`)}
-      ${dep ? F('SID / DP (if required)', `<select data-b="dep.sid" data-dyn="sid"></select>`) : F('STAR (if used)', `<select data-b="${k}.star" data-dyn="star"></select>`)}
+      ${dep ? F('SID / DP / ODP (if required)', `<select data-b="dep.sid" data-dyn="sid"></select>`, '', '<span class="hint" id="odpHint"></span>') : F('STAR (if used)', `<select data-b="${k}.star" data-dyn="star"></select>`)}
       ${dep ? F('Transition', `<input data-b="dep.trans" value="${esc(S.m.dep.trans)}" list="dl-trans" placeholder="type or pick" autocomplete="off"><datalist id="dl-trans"></datalist>`) : F('TEMPO visibility', inp(k + '.tvis', { ph: '1/2 FG' }))}
       ${dep ? '' : F('TEMPO cloud layer', inp(k + '.tcl', { ph: 'BKN 003' }))}
       </div>`;
@@ -69,7 +69,7 @@
       ${F('Min after dep', inp('dep.min', { attrs: 'inputmode="numeric"', ph: '10' }))}</div>`
       : `<h3>Approach clearance</h3><div class="grid">${F('Clearance type', sel(k + '.ac', M.CLR_TYPES.map(x => [x, x.replace(/\s+/g, ' ')])), 'full')}</div>`;
     return `<section class="card" data-ap="${k}"><h2>${APN[k]}<small id="cnt-${k}"></small></h2>
-      <div class="grid"><div class="f full"><label>Airport (ID, name or city)${D.states().length > 1 ? `<select class="stsel" aria-label="Search in state" title="Limit the airport search to one state (typing an exact ID always works)">${['ALL'].concat(D.states()).map(x => `<option value="${x}"${(S.settings.stFilter || 'ALL') === x ? ' selected' : ''}>${x === 'ALL' ? 'All states' : x}</option>`).join('')}</select>` : ''}</label><input data-b="${k}.id" data-pick="${k}" value="${esc(S.m[k].id)}" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="e.g. KTUS, KMDT, RYN, Harrisburg"><ul class="sug" hidden></ul></div></div>
+      <div class="grid"><div class="f full"><label>Airport (ID, name or city)${D.loadedStates().length > 1 ? `<select class="stsel" aria-label="Search in state" title="Limit the name/city search to one downloaded state (typing an exact ID always works, in any state)">${stOpts()}</select>` : ''}</label><input data-b="${k}.id" data-pick="${k}" value="${esc(S.m[k].id)}" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="ID, name or city, e.g. KJFK, KDEN, Harrisburg"><ul class="sug" hidden></ul></div></div>
       <div class="apinfo" id="info-${k}"></div>${wx}${ops}${ctlSec}${clr}</section>`;
   }
   function planHTML() {
@@ -93,7 +93,8 @@
       ${F('In order to… (purpose)', inp('amr.purpose'))}${F('…who / what', inp('amr.who'))}
       ${F('Leg 1 navigation', sel('amr.nav1', M.NAV_LIST))}${F('Leg 2 navigation', sel('amr.nav2', M.NAV_LIST))}
       ${F('Unit / station', inp('amr.unit', { ph: 'e.g. UNIT / KXXX' }), 'span2')}
-      ${F('Weight &amp; balance', inp('amr.wb', { ph: 'KTUS / 28 OCT 26' }))}${F('ELA', inp('amr.ela', { ph: 'L-4, L-5' }))}
+      ${F('Weight &amp; balance', inp('amr.wb', { ph: 'KTUS / 28 OCT 26' }))}${F('IFR Enroute Low charts (blank = auto)', inp('amr.ela', { ph: 'auto from the airports above' }), 'span2', '<span class="hint" id="elaHint"></span>')}
+      ${F('Approach plates / d-TPP volume (blank = auto)', inp('amr.iap', { ph: 'auto from the approaches picked above' }), 'span2', '<span class="hint" id="iapHint"></span>')}
       ${F('VFR sectional (blank = auto from the route)', inp('amr.sect', { ph: 'auto from the airports above' }), 'span2', '<span class="hint" id="sectHint"></span>')}</div>
       <h3>Crew &amp; passengers</h3><div class="grid g3">
       ${[0, 1, 2].map(i => F(['PC', 'PI', 'IP / other'][i] + ' name', inp(`amr.crew.${i}.name`)) + F('Rank', inp(`amr.crew.${i}.rank`)) + (i === 2 ? F('Org / station', inp('amr.crew.2.org')) : '<div></div>')).join('')}
@@ -137,8 +138,14 @@
     };
     set('apr', a && a.i, a ? '— select approach —' : '— pick an airport —');
     set('rwy', a && a.r, a ? '— select runway —' : '— pick an airport —');
-    if (k === 'dep') { set('sid', a && a.d, '— none (as filed) —'); const dl = $('#dl-trans'); const tr = (a && a.x && a.x[x.sid]) || []; dl.innerHTML = tr.map(t => `<option value="${esc(t)}">`).join(''); if (!x.sid) x.trans = ''; $('[data-b="dep.trans"]').value = x.trans; }
+    if (k === 'dep') { const sids = ((a && a.d) || []).slice(); if (a && a.o && a.o.length) sids.push(M.ODP_TXT); set('sid', a && sids, '— none (as filed) —'); renderOdp(); const dl = $('#dl-trans'); const tr = (a && a.x && a.x[x.sid]) || []; dl.innerHTML = tr.map(t => `<option value="${esc(t)}">`).join(''); if (!x.sid) x.trans = ''; $('[data-b="dep.trans"]').value = x.trans; }
     else set('star', a && a.s, '— none —');
+  }
+  function renderOdp() {
+    const el = $('#odpHint'); if (!el) return; const a = D.ap(S.m.dep.id);
+    if (!a || !a.o || !a.o.length) { el.textContent = ''; return; }
+    el.textContent = S.m.dep.sid === M.ODP_TXT ? 'FAA Takeoff Minimums / Obstacle DP section: ' + a.o.join(' ') + ' (the script says "via the published obstacle departure procedure")'
+      : 'This airport also has a textual obstacle departure procedure - pick it in the list to see it here and in the script.';
   }
   const FREQ_ORDER = { 'A/D': 0, 'CNTR': 1 };
   function freqText(a) {
@@ -195,6 +202,17 @@
     const el = $('#sectHint'); if (!el) return; const sc = M.sectionals(S.m, env), ov = String(S.m.amr.sect || '').trim();
     el.textContent = (sc.text ? 'FAA sectional for this route: ' + sc.text : 'No sectional found for this route in the FAA data') + (sc.missing.length ? ' (no chart listed for ' + sc.missing.join(', ') + ')' : '') + (ov ? ' • the AMR uses your typed entry - clear it to go back to auto' : ' • filled in on the AMR automatically');
   }
+  function renderEla() {
+    const el = $('#elaHint'); if (!el) return; const e = M.ela(S.m, env), ov = String(S.m.amr.ela || '').trim();
+    el.textContent = (e.text ? 'FAA IFR Enroute Low for this route: ' + e.text + ' (' + e.byRoute.join('; ') + ')' : 'No IFR Enroute Low chart found for this route in the FAA coverage data') + (e.missing.length ? ' - no L-chart footprint covers ' + e.missing.join(', ') : '')
+      + (ov ? ' • the AMR uses your typed entry - clear it to go back to auto' : ' • approximate (from chart coverage areas) - verify on the chart • filled in on the AMR automatically');
+  }
+  function renderPlates() {
+    const el = $('#iapHint'); if (!el) return; const p = M.plates(S.m, env), ov = String(S.m.amr.iap || '').trim();
+    el.textContent = (p.text ? 'd-TPP: ' + p.text : 'No d-TPP volume found for this route') + (p.missing.length ? ' (no volume listed for ' + p.missing.join(', ') + ')' : '')
+      + (ov ? ' • the AMR uses your typed entry - clear it to go back to auto' : ' • plates come from the Approach in use you pick above (the alternate shows its volume only)');
+  }
+  function renderPubs() { renderSect(); renderEla(); renderPlates(); }
   function renderSerial() {
     const el = $('#serialHint'); if (!el) return; const ser = M.serNum(S.m, env), d = D.device(S.m.device);
     const ac = D.acft(S.m.acft);
@@ -212,7 +230,7 @@
   function refreshPlan(only) {
     const ks = only ? [only] : ['dep', 'd1', 'd2'];
     ks.forEach(k => { fillDyn(k); renderInfo(k); renderMsgs(k); });
-    renderCtl(); renderAlt(); renderSect(); renderSerial(); renderGC(); renderTiming();
+    renderCtl(); renderAlt(); renderPubs(); renderSerial(); renderGC(); renderTiming();
   }
 
   /* ---------- picker ---------- */
@@ -221,10 +239,15 @@
       const ul = inpEl.parentElement.querySelector('.sug'), path = inpEl.dataset.b; let hl = -1, items = [];
       const show = () => {
         items = D.search(inpEl.value, 8); hl = -1;
+        if (items.length < 8) D.searchIndex(inpEl.value, 4).forEach(x => items.push(x));        // exact/prefix IDs in states that are not downloaded yet
         if (!items.length || document.activeElement !== inpEl) { ul.hidden = true; return; }
-        ul.innerHTML = items.map((a, i) => `<li data-i="${i}"><b>${esc(a.id)}</b> ${esc(a.n)}<small>${esc(a.c)} • ${esc(D.kindLabel(a.k))} • ${a.e == null ? '?' : a.e} ft</small></li>`).join(''); ul.hidden = false;
+        ul.innerHTML = items.map((a, i) => a.n === undefined ? `<li data-i="${i}"><b>${esc(a.id)}</b> in ${esc(D.stName(a.st))}<small>tap to download ${esc(a.st)} (${esc(kb((D.cycle.states[a.st] || {}).gz))}) and use it</small></li>`
+          : `<li data-i="${i}"><b>${esc(a.id)}</b> ${esc(a.n)}<small>${esc(a.c)} • ${esc(D.kindLabel(a.k))} • ${a.e == null ? '?' : a.e} ft</small></li>`).join(''); ul.hidden = false;
       };
-      const choose = a => { inpEl.value = a.id; ul.hidden = true; commitAirport(path, a.id, inpEl.dataset.pick); };
+      const choose = async a => {
+        if (a.n === undefined) { try { await D.loadState(a.st); afterLoad(); } catch (e) { toast('Could not download ' + a.st + ' (offline?)'); return; } }
+        inpEl.value = a.id; ul.hidden = true; commitAirport(path, a.id, inpEl.dataset.pick);
+      };
       inpEl.addEventListener('input', e => { e.stopPropagation(); show(); });
       inpEl.addEventListener('focus', () => { inpEl.select(); show(); });
       inpEl.addEventListener('keydown', e => {
@@ -234,7 +257,10 @@
         e.preventDefault(); lis.forEach((l, i) => l.classList.toggle('hl', i === hl));
       });
       ul.addEventListener('pointerdown', e => { const li = e.target.closest('li'); if (li) { e.preventDefault(); choose(items[+li.dataset.i]); } });
-      const commitFree = () => { ul.hidden = true; const id = D.resolve(inpEl.value); if (id) { inpEl.value = id; commitAirport(path, id, inpEl.dataset.pick); } else if (inpEl.value.trim() === '' || true) { commitAirport(path, inpEl.value.trim().toUpperCase(), inpEl.dataset.pick); } };
+      const commitFree = async () => {
+        ul.hidden = true; const raw = inpEl.value; let id = D.resolve(raw);
+        if (!id && raw.trim()) { try { id = await D.resolveAsync(raw); if (id) afterLoad(); } catch (e) { toast('Could not download that airport\'s state (offline?)'); } if (inpEl.value !== raw) return; }
+        if (id) { inpEl.value = id; commitAirport(path, id, inpEl.dataset.pick); } else if (inpEl.value.trim() === '' || true) { commitAirport(path, inpEl.value.trim().toUpperCase(), inpEl.dataset.pick); } };
       inpEl.addEventListener('blur', () => setTimeout(commitFree, 120));
     });
   }
@@ -242,7 +268,7 @@
     if (getp(path) === id) { if (k !== 'alt2') renderInfo(k); return; }
     setp(path, id); save();
     if (k !== 'alt2') { const x = S.m[k]; x.apr = ''; x.rwy = ''; if (k === 'dep') { x.sid = ''; x.trans = ''; } else x.star = ''; refreshPlan(k); renderGC(); }
-    renderAlt(); renderGC(); renderSect(); if (S.tab !== 'plan') renderView();
+    renderAlt(); renderGC(); renderPubs(); if (S.tab !== 'plan') renderView();
   }
 
   /* ---------- generic input handler ---------- */
@@ -257,12 +283,15 @@
         const r = M.aprRwy(v), a = D.ap(S.m[k].id);
         if (r && a && a.r && a.r.includes(r)) { S.m[k].rwy = r; const re = $(`[data-b="${k}.rwy"]`); if (re) re.value = r; }
       }
-      if (fld === 'sid') { fillDyn(k); }
+      if (fld === 'sid') { fillDyn(k); renderOdp(); }
       renderMsgs(k);
     }
     if (path === 'device') { const d = D.device(v.trim()); if (d && D.acft(d.type)) { S.m.acft = d.type; const ae = $('[data-b="acft"]'); if (ae) ae.value = d.type; } renderSerial(); }
     if (path === 'acft') renderSerial();
     if (path === 'amr.sect') renderSect();
+    if (path === 'amr.ela') renderEla();
+    if (path === 'amr.iap') renderPlates();
+    if (/^(dep|d1|d2)\.apr$/.test(path)) renderPlates();
     if (/^(d1|d2)\./.test(path) || path === 'noAlt') renderAlt();
     if (path === 'name') $('#missionLabel').textContent = v || 'New mission';
     if (/^(fp|scriptOpts)\./.test(path)) renderTiming();
@@ -467,9 +496,12 @@
     const cyc = D.manifest.cycles;
     return `<div class="cards"><section class="card wide"><h2>FAA data</h2>
       <div class="kv"><b>Cycle in use</b><span>${esc(c.tpp)} - ${esc(c.from.slice(0, 10))} 0901Z to ${esc(c.to.slice(0, 10))} 0901Z <b style="color:${st.state === 'current' ? 'var(--ok)' : 'var(--bad)'}">${st.text}</b></span>
-      <b>NASR cycle</b><span>${esc(c.nasr)}</span><b>States loaded</b><span>${Object.keys(D.loaded).join(', ')} (${Object.keys(D.airports).length} airports)</span><b>Filter</b><span>public-use + military airports/heliports + private heliports (no private airstrips, ultralights, gliderports or seaplane bases)</span></div>
+      <b>NASR cycle</b><span>${esc(c.nasr)}</span><b>States in memory</b><span>${D.loadedStates().join(', ') || 'none'} (${Object.keys(D.airports).length} airports)</span><b>Filter</b><span>public-use + military airports/heliports + private heliports (no private airstrips, ultralights, gliderports or seaplane bases)</span></div>
       <div class="grid g2" style="margin-top:8px">${F('Data cycle', `<select id="cycSel"><option value="auto"${S.settings.cycle === 'auto' ? ' selected' : ''}>Automatic (by today's date)</option>${cyc.map(x => `<option value="${x.tpp}"${S.settings.cycle === x.tpp ? ' selected' : ''}>${x.tpp} (${x.from.slice(0, 10)} → ${x.to.slice(0, 10)})</option>`).join('')}</select>`)}</div>
       <div class="msg warn" style="margin-top:8px"><b>For training and planning only.</b> Airport data, runways, approaches, SIDs, STARs and frequencies come from the FAA NASR subscription and d-TPP metafile and are <b>not</b> a substitute for current FAA / DoD flight publications (IFR Supplement, charts, NOTAMs). Verify everything against current publications before flight.</div></section>
+    <section class="card wide" id="stCard"><h2>States on this device</h2>
+      <p class="fx">Tick the states you fly in: each is downloaded once and kept for offline use (the size is the download). Unticking removes it. An airport ID typed anywhere in the U.S. is fetched on demand even if its state is not ticked. The nationwide ID index is always loaded.</p>
+      ${QUICK}<div id="stGrid"></div><p class="fx sttot"></p><p class="fx" id="stMsg"></p></section>
     <section class="card"><h2>Settings</h2>
       <div class="f chk"><input type="checkbox" id="legacy175" ${S.settings.legacy175 ? 'checked' : ''}><label for="legacy175">Show legacy DD 175 (the DD 1801 is the flight plan)</label></div>
       <div class="f chk"><input type="checkbox" id="compat" ${S.settings.compat ? 'checked' : ''}><label for="compat">Workbook-compatible mode (reproduce workbook quirks)</label></div>
@@ -490,7 +522,8 @@
       <div class="kv"><b>Version</b><span id="verTxt">v${esc(BUILD.version)}</span><b>Build</b><span id="verBuild">${esc(BUILD.commit)}${BUILD.built ? ' • ' + esc(BUILD.built) : ''}</span><b>Latest</b><span id="verLatest">checking…</span></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" id="btnUpd">Check for updates</button><button class="btn" id="btnHard">Force refresh app files</button></div>
       <p class="fx">New releases install themselves: the app reloads when it finds one (your inputs are saved first). If something looks out of date, tap "Force refresh app files" - it clears this app's cached files (not your missions) and reloads.</p></section>
-    <section class="card wide"><h2>About</h2><p class="fx">IFR AMR Planner v${VERSION}. Replaces the Cheat Sheet → AMR / DD 1801 / DD 175-1 / Grade Sheet workflow of the Army instrument AMR Excel template. Works offline after the first load; add to the Home Screen from Safari's Share menu. Missions are saved only in this browser (localStorage) - use Missions → Export to back them up. Not covered: other states, ADS-B/winds-aloft/live weather.</p></section></div>`;
+    <section class="card wide"><h2>About</h2><p class="fx">IFR AMR Planner v${VERSION}. A free, open-source planner for IFR training missions across the United States and territories: AMR, DD 1801 / 1801-C, DD 175-1 and radio scripts built from FAA NASR, d-TPP and CIFP data. Works offline after the first load; add it to the Home Screen from Safari's Share menu. Missions are saved only in this browser (localStorage) - use Missions → Export to back them up. Not covered: live weather, NOTAMs, winds aloft, ADS-B.</p>
+      <div class="msg warn"><b>Not for real-world navigation.</b> This is a training and planning aid. Data may be incomplete or out of date; the IFR Enroute Low chart list is derived from chart coverage areas and is approximate. Always verify with the official FAA / DoD publications (charts, IFR Supplement, NOTAMs) before flight. Provided as is, with no warranty.</p></section></div>`;
   }
 
   /* ---------- views ---------- */
@@ -509,6 +542,7 @@
     renderView(); window.scrollTo(0, 0);
   }
   function wireInfo() {
+    wireStatesCard();
     const cs = $('#cycSel'); cs && cs.addEventListener('change', async () => { S.settings.cycle = cs.value; jset(LS.settings, S.settings); await reloadData(); toast('Using cycle ' + D.cycle.tpp); });
     const bu = $('#btnUpd'); bu && bu.addEventListener('click', async () => { $('#verLatest').textContent = 'checking…'; await checkVersion(true); });
     const bh = $('#btnHard'); bh && bh.addEventListener('click', hardRefresh);
@@ -518,7 +552,7 @@
     const bw = $('#btnWipe'); bw && bw.addEventListener('click', () => { if (confirm('Erase all saved missions and settings on this device?')) { Object.values(LS).forEach(k => localStorage.removeItem(k)); location.reload(); } });
   }
   async function reloadData() {
-    await D.init(S.settings.cycle); await D.loadAll(); D.stFilter = S.settings.stFilter || 'ALL'; badge(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
+    await D.init(S.settings.cycle); await ensureStates(); badge(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
   }
   function badge() {
     const c = D.cycle, st = D.cycleStatus(c), el = $('#cycBadge');
@@ -526,6 +560,79 @@
     el.title = `NASR ${c.nasr}; d-TPP ${c.tpp} effective ${c.from} to ${c.to}. Training/planning only - verify against current FAA publications.`;
   }
   function afterPlan() { wirePickers($('#view-plan')); $$('.stsel', $('#view-plan')).forEach(el => el.addEventListener('change', () => { S.settings.stFilter = D.stFilter = el.value; jset(LS.settings, S.settings); $$('.stsel').forEach(o => { o.value = el.value; }); })); refreshPlan(); $('#missionLabel').textContent = S.m.name || 'New mission'; }
+
+  /* ---------- states: which FAA state files are on this device ---------- */
+  const kb = b => b ? (b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' kB') : '';
+  function stOpts() { return ['ALL'].concat(D.loadedStates()).map(x => `<option value="${x}"${(S.settings.stFilter || 'ALL') === x ? ' selected' : ''}>${x === 'ALL' ? 'All downloaded states' : x}</option>`).join(''); }
+  function afterLoad() {                                       // a state was loaded or unloaded: refresh the state filters and the Info list
+    if (S.settings.stFilter !== 'ALL' && !D.loaded[S.settings.stFilter]) S.settings.stFilter = D.stFilter = 'ALL';
+    $$('.stsel').forEach(el => { el.innerHTML = stOpts(); });
+    if (S.tab === 'info') { const g = $('#stGrid'); if (g) fillStGrid(g, new Set(S.settings.states || [])); }
+  }
+  const missionStates = m => { const out = new Set(); ['dep', 'd1', 'd2', 'alt2'].forEach(k => { const r = m && m[k] && D.stateOf(m[k].id); if (r) out.add(r.st); }); return out; };
+  async function ensureStates() {                              // the chosen states + whatever the current mission needs (found through the nationwide ID index)
+    await D.loadIndex();
+    const need = new Set(S.settings.states || []); missionStates(S.m).forEach(st => need.add(st));
+    await D.loadStates(Array.from(need)); D.stFilter = S.settings.stFilter || 'ALL'; afterLoad();
+  }
+  async function setStates(list) {                             // download the newly ticked states (the service worker keeps them offline), drop the unticked ones
+    const old = S.settings.states || [], add = list.filter(x => old.indexOf(x) < 0), rem = old.filter(x => list.indexOf(x) < 0), keep = missionStates(S.m);
+    S.settings.states = list.slice(); jset(LS.settings, S.settings);
+    for (const st of rem) { if (!keep.has(st)) { D.unloadState(st); await D.dropState(st); } }
+    if (add.length) {
+      try { await D.loadStates(add); } catch (e) { S.settings.states = list.filter(x => D.loaded[x] || old.indexOf(x) >= 0); jset(LS.settings, S.settings); toast('Could not download all states - check your connection'); }
+    }
+    afterLoad();
+  }
+  const REGIONS = [['Northeast', 'CT ME MA NH NJ NY PA RI VT'], ['Mid-Atlantic & Southeast', 'DC DE MD VA WV NC SC GA FL AL MS TN KY'], ['Midwest', 'OH MI IN IL WI MN IA MO ND SD NE KS'],
+    ['South Central', 'AR LA OK TX'], ['Mountain & Southwest', 'AZ NM CO UT NV WY MT ID'], ['Pacific', 'CA OR WA AK HI'], ['Territories & other', 'PR VI GU AS MP UM XX']];
+  function stGridHTML(sel) {
+    const have = D.states();
+    return REGIONS.map(([r, list]) => { const sts = list.split(' ').filter(x => have.indexOf(x) >= 0); return sts.length ? `<h4>${r}</h4><div class="stgrid">${sts.map(st => { const e = D.cycle.states[st];
+      return `<label class="stc"><input type="checkbox" data-st="${st}"${sel.has(st) ? ' checked' : ''}><span><b>${esc(D.stName(st))}</b> <small>${st} • ${e.airports} airports • ${kb(e.gz)}<em class="cch" data-cch="${st}"></em></small></span></label>`; }).join('')}</div>` : ''; }).join('');
+  }
+  function fillStGrid(el, sel) { el.innerHTML = stGridHTML(sel); stTotal(el); cacheMarks(el); }
+  function stTotal(root) {
+    const t = $$('input[data-st]:checked', root).reduce((n, i) => n + ((D.cycle.states[i.dataset.st] || {}).gz || 0), 0), c = $$('input[data-st]:checked', root).length, el = $('.sttot', root.parentElement || root);
+    if (el) el.textContent = c + ' selected • ' + (c ? kb(t) + ' download' : 'nothing downloaded - IDs you type are fetched on demand');
+  }
+  async function cacheMarks(root) { for (const e of $$('[data-cch]', root)) { const on = await D.cached(e.dataset.cch); e.textContent = on ? ' • saved offline' : ''; } }
+  function quickPick(root, which) {
+    const all = D.states(); const want = which === 'all' ? all : which === 'none' ? [] : which.split(',').filter(x => all.indexOf(x) >= 0);
+    $$('input[data-st]', root).forEach(i => { i.checked = want.indexOf(i.dataset.st) >= 0; });
+  }
+  const QUICK = `<div class="chips"><button class="btn sm" data-q="AZ,PA">AZ + PA</button><button class="btn sm" data-q="all">All states</button><button class="btn sm" data-q="none">None</button></div>`;
+  function wireQuick(root, onChange) {
+    root.addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (b) { quickPick(root, b.dataset.q); stTotal($('#stGrid', root)); onChange && onChange(); } });
+    root.addEventListener('change', e => { if (e.target.matches('input[data-st]')) { stTotal($('#stGrid', root)); onChange && onChange(); } });
+  }
+  const pickedStates = root => $$('input[data-st]:checked', root).map(i => i.dataset.st);
+  let stBusy = Promise.resolve();
+  function wireStatesCard() {
+    const card = $('#stCard'); if (!card) return; fillStGrid($('#stGrid'), new Set(S.settings.states || []));
+    wireQuick(card, () => { stBusy = stBusy.then(async () => { const want = pickedStates(card); const was = (S.settings.states || []).join(); if (want.join() === was) return; $('#stMsg').textContent = 'Downloading…'; await setStates(want); $('#stMsg').textContent = 'Saved on this device'; cacheMarks($('#stGrid')); }); });
+  }
+  function openWelcome() {
+    const w = $('#welcome'); if (!w) return;
+    w.innerHTML = `<div class="box"><h2 style="margin:0 0 6px">IFR AMR Planner</h2>
+      <p class="fx" style="margin:0 0 8px">Plan an IFR mission, then fill the AMR, DD 1801 / 1801-C, DD 175-1 and the radio scripts from FAA data. Free, no account, works offline.</p>
+      <div class="msg warn"><b>Not for real-world navigation.</b> Training and planning aid only - verify everything with official FAA / DoD publications.</div>
+      <h3 style="margin:12px 0 4px">Which states do you fly in?</h3>
+      <p class="fx" style="margin:0 0 6px">Tick the states to download for offline use (1 kB to 110 kB each, about 1.3 MB for all of them). You can change this any time on the Info tab, and any airport ID you type is fetched on demand.</p>
+      ${QUICK}<div id="stGrid"></div><p class="fx sttot"></p>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn pri" id="wGo" style="flex:1">Continue</button></div></div>`;
+    w.hidden = false; const box = $('.box', w); fillStGrid($('#stGrid', box), new Set(S.settings.states || []));
+    wireQuick(box, () => { $('#wGo').textContent = pickedStates(box).length ? 'Download & continue' : 'Continue without downloading'; });
+    $('#wGo').textContent = 'Continue without downloading';
+    $('#wGo').addEventListener('click', async () => {
+      const b = $('#wGo'); b.disabled = true; b.textContent = 'Downloading…';
+      const want = pickedStates(box); S.settings.welcomed = true; await setStates(want); S.settings.welcomed = true; jset(LS.settings, S.settings);
+      S.m = freshMission(); jset(LS.cur, S.m); await ensureStates(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView(); w.hidden = true; w.innerHTML = '';
+    });
+  }
+  function freshMission() {                                    // new mission: the workbook's sample airports only when Arizona is one of the chosen states (otherwise blank - never a state you did not pick)
+    const m = M.defaultMission(); if ((S.settings.states || []).indexOf('AZ') < 0) { m.dep.id = ''; m.d1.id = ''; m.d2.id = ''; } return m;
+  }
 
   /* ---------- missions modal ---------- */
   const missions = () => jget(LS.missions, {});
@@ -544,9 +651,6 @@
     S.m = merge(M.defaultMission(), migrate(obj)); jset(LS.cur, S.m);
     await ensureStates(); $('#view-plan').innerHTML = planHTML(); afterPlan(); renderView();
   }
-  async function ensureStates() {   // make sure all shipped states are loaded
-    await D.loadAll();                                  // v1.4: every shipped state (AZ + PA) is loaded, so a mission can mix states
-  }
   function wireModal() {
     const m = $('#modal');
     m.addEventListener('click', async e => {
@@ -557,7 +661,7 @@
       else if (a === 'load') { await loadMission(ms[n]); m.hidden = true; toast('Loaded "' + n + '"'); }
       else if (a === 'dup') { let nn = n + ' copy'; while (ms[nn]) nn += '+'; ms[nn] = Object.assign({}, ms[n], { name: nn, saved: new Date().toISOString() }); jset(LS.missions, ms); openMissions(); }
       else if (a === 'del') { if (confirm('Delete "' + n + '"?')) { delete ms[n]; jset(LS.missions, ms); openMissions(); } }
-      else if (a === 'new') { await loadMission(M.defaultMission()); m.hidden = true; toast('New mission'); }
+      else if (a === 'new') { await loadMission(freshMission()); m.hidden = true; toast('New mission'); }
       else if (a === 'example') { const d = M.defaultMission(); d.name = 'KTUS-KRYN-KDMA example'; d.dep.id = 'KTUS'; d.d1.id = 'KRYN'; d.d2.id = 'KDMA'; d.dep.apr = ''; await loadMission(d); m.hidden = true; toast('Example loaded'); }
       else if (a === 'export') { const blob = new Blob([JSON.stringify({ app: 'amr-planner', version: 1, current: S.m, missions: ms }, null, 1)], { type: 'application/json' }); const u = URL.createObjectURL(blob); const l = document.createElement('a'); l.href = u; l.download = 'amr-missions-' + M.isoDate(new Date()) + '.json'; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); }
     });
@@ -650,17 +754,23 @@
 
   /* ---------- boot ---------- */
   async function boot() {
+    const fresh = (() => { try { return Object.values(LS).every(k => localStorage.getItem(k) == null); } catch (e) { return false; } })();     // nothing saved yet = first run
     S.settings = Object.assign(S.settings, jget(LS.settings, {}));
-    await D.init(S.settings.cycle);
-    await D.loadAll(); D.stFilter = S.settings.stFilter || 'ALL';
+    if (!Array.isArray(S.settings.states)) {                  // v1.5 and older had AZ + PA built in: keep them, no first-run screen
+      S.settings.states = fresh ? [] : ['AZ', 'PA']; S.settings.welcomed = !fresh; jset(LS.settings, S.settings);
+    }
+    await D.init(S.settings.cycle); await D.loadIndex();
     S.m = merge(M.defaultMission(), migrate(jget(LS.cur, null)));
+    if (fresh) S.m = freshMission();
+    await ensureStates();
     badge();
     $('#view-plan').innerHTML = planHTML(); afterPlan(); wire();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => { });
     }
     watchUpdates();
-    window.__amr = { S, M, D, env, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
+    if (!S.settings.welcomed) openWelcome();
+    window.__amr = { S, M, D, env, setStates, ensureStates, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
     document.body.dataset.ready = '1';
   }
   boot().catch(e => { document.body.insertAdjacentHTML('afterbegin', `<pre style="color:#b00;padding:12px">Failed to start: ${esc(e.message)}</pre>`); console.error(e); });

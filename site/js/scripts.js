@@ -120,7 +120,7 @@
     ['ATIS', 'ASOS', 'AWOS'].forEach(k => {          // all three variants kept for the "what if" view / tests
       out.depWx[k] = wxLine(Object.assign({}, D), sD, 'dep', aD); out.d1Wx[k] = ''; out.d2Wx[k] = '';
     });
-    const sidTxt = x => x.sid ? ' via ' + FV + x.sid + FE + ' departure' + (x.trans ? ', ' + FV + x.trans + FE + ' transition' : '') + ', then as filed.' : ' as filed.';
+    const sidTxt = x => x.sid === M.ODP_TXT ? ' via the published obstacle departure procedure, then as filed.' : x.sid ? ' via ' + FV + x.sid + FE + ' departure' + (x.trans ? ', ' + FV + x.trans + FE + ' transition' : '') + ', then as filed.' : ' as filed.';
     const climb = ' Climb and Maintain ' + val(D.maint, 'altitude') + '.' + (D.exp ? ' Expect ' + FV + D.exp + FE + ', ' + val(D.min, 'minutes') + ' minutes after departure.' : '');
     const fD = HD.fac, depF = fD ? fD.f : null;                       // first contact after departure and its frequency
     const dName = f => (f ? (f.kind === 'T' && ctlD.towered ? f.dep : f.name) : '');        // "Tucson Departure" off a towered field, "Tucson Approach" / "Albuquerque Center" otherwise

@@ -20,13 +20,14 @@
   M.CLR_TYPES = ['NON RNAV Pub Rte', 'NON RNAV  Unpub RTE', 'RNAV within TAA', 'RNAV outside TAA', 'RNAV No TAA',
                  'Vector Non RNAV', 'Vector RNAV w/in TAA', 'Vector RNAV no TAA'];   // Calls!G4:G11 (listAPR_Type)
   M.CT_LIST = ['BKN', 'OVC', 'VV'];
+  M.ODP_TXT = 'Obstacle departure procedure (textual, see Takeoff Minimums)';
   M.NAV_LIST = ['Conventional Ground based', 'Space based'];
 
   M.defaultMission = function (today) {
     const t = new Date(today || Date.now()); t.setDate(t.getDate() + 1);       // workbook: =TODAY()+1
     return {
       v: 1, name: '', date: isoDate(t), acft: 'UH-72', device: '78724',
-      dep: { id: '02AZ', wind: '090', ws: '10', vis: '1 FG', ct: 'OVC', ceil: '002', temp: '18', dp: '17', altim: '29.92',
+      dep: { id: 'KPHX', wind: '090', ws: '10', vis: '1 FG', ct: 'OVC', ceil: '002', temp: '18', dp: '17', altim: '29.92',
              wx: 'AUTO', apr: '', rwy: '', sid: '', trans: '', cd: 'ATC', maint: '020', exp: '040', min: '10',
              ctl: 'AUTO', cdm: 'PHONE', cdPh: '', gcoF: '', ho: 'AUTO' },
       d1: { id: 'KTUS', wind: '120', ws: '10', vis: '1 HZ', ct: 'OVC', ceil: '006', temp: '18', dp: '17', altim: '29.94',
@@ -38,7 +39,7 @@
              missionTxt: '', specialTxt: '', intent: 'Accomplish the mission safely, to standard, on time and IAW applicable regulations, while complying with special instructions.  Complete INST APART during mission.',
              pax: { name: 'none', rank: '', org: '' },
              crew: [ { name: '', rank: '', role: 'PC' }, { name: '', rank: '', role: 'PI' }, { name: '', rank: '', role: 'IP', org: '' } ],
-             unit: '', wb: '', ela: '', sect: '',
+             unit: '', wb: '', ela: '', sect: '', iap: '',
              remarks: 'All times published are Zulu unless stated otherwise.  (Use local time as Zulu)\nSee DD175-1 Remarks for NOTAM information' },
       scriptOpts: { voidMin: '30', nltMin: '30' },                 // clearance void time and NLT, minutes after ETD (Scripts)
       fp: { etd: '1930', tas: '110', alt1: '040', alt2: '040', rules: 'I', route1: '', route2: '', termRoute: '',
@@ -168,6 +169,40 @@
     return { list, text: list.join(', '), missing };
   };
 
+  /* ---------- IFR Enroute Low (L-) charts for the route: airport field 'el' = charts whose FAA footprint contains the airport (most interior first).
+     Greedy minimal set in route order: an airport already covered by a chosen chart adds nothing; a chart that became redundant is dropped again. ---------- */
+  M.ela = function (m, env) {
+    const ids = [m.dep && m.dep.id, m.d1 && m.d1.id, m.d2 && m.d2.id, m.alt2 && m.alt2.id].map(x => s(x).trim().toUpperCase()).filter(Boolean);
+    const list = [], missing = [], per = {}, seen = {};
+    ids.forEach(id => {
+      if (seen[id]) return; seen[id] = 1;
+      const a = env.ap(id); if (!a) return;
+      const el = a.el || []; if (!el.length) { missing.push(id); return; }
+      per[id] = el; if (!el.some(c => list.indexOf(c) >= 0)) list.push(el[0]);
+    });
+    for (let i = list.length - 1; i >= 0; i--) {                       // drop a chart when every airport it covers is also on another chosen chart
+      const rest = list.filter((c, j) => j !== i);
+      if (Object.keys(per).every(id => per[id].some(c => rest.indexOf(c) >= 0))) list.splice(i, 1);
+    }
+    const byRoute = Object.keys(per).map(id => id + ': ' + per[id].join(' / '));
+    return { list, text: list.join(', '), missing, per, byRoute };
+  };
+
+  /* ---------- Approach plates: d-TPP SIAP volume (airport field 'v') + the approach chosen on the Plan, grouped by volume in route order ---------- */
+  M.plates = function (m, env) {
+    const groups = [], seen = {}, missing = [], plates = [], sp = {};
+    [['dep', m.dep], ['d1', m.d1], ['d2', m.d2], ['alt2', m.alt2]].forEach(([k, x]) => {
+      const id = s(x && x.id).trim().toUpperCase(); if (!id) return;
+      const a = env.ap(id); if (!a) return;
+      const vol = s(a.v).trim(); if (!vol) { if (missing.indexOf(id) < 0) missing.push(id); return; }
+      let g = groups.find(q => q.vol === vol); if (!g) { g = { vol, items: [] }; groups.push(g); }
+      const apr = k === 'alt2' ? '' : s(x.apr).trim();
+      if (apr && !sp[id + '|' + apr]) { sp[id + '|' + apr] = 1; g.items.push(apr + ' (' + id + ')'); plates.push({ id, vol, name: apr }); }
+    });
+    const text = groups.map(g => g.vol + (g.items.length ? ': ' + g.items.join(', ') : '')).join(' \u2022 ');
+    return { groups, text, missing, plates, vols: groups.map(g => g.vol) };
+  };
+
   /* ---------- AMR page ---------- */
   M.amr = function (m, env) {
     const ac = env.acft(m.acft) || {}, A = m.amr, F = m.fp;
@@ -193,8 +228,11 @@
     o.crew = A.crew.map((c, i) => ({ name: c.name, rank: c.rank, role: c.role, org: (i < 2) ? s(A.unit) + ' (' + c.role + ')' : s(c.org) }));
     o.remarks = A.remarks;
     const a1 = env.ap(m.d1.id), a2 = env.ap(m.d2.id), v1 = a1 && a1.v || '', v2 = a2 && a2.v || '';
-    o.iap = v1 === v2 ? v1 : v1 + ' , ' + v2;
-    o.ela = A.ela;
+    o.iapLegacy = v1 === v2 ? v1 : v1 + ' , ' + v2;                 // the Excel template's IAP cell (kept for the workbook comparison tests)
+    const pl = M.plates(m, env); o.iapAuto = pl.text; o.iapOverride = s(A.iap).trim() !== '';
+    o.iap = o.iapOverride ? s(A.iap).trim() : pl.text;               // blank override = auto: volume(s) + the approaches picked on the Plan
+    const el = M.ela(m, env); o.elaAuto = el.text; o.elaOverride = s(A.ela).trim() !== '';
+    o.ela = o.elaOverride ? s(A.ela).trim() : el.text;               // blank override = auto from the FAA IFR Enroute Low chart footprints
     const sc = M.sectionals(m, env); o.sectAuto = sc.text; o.sectList = sc.list; o.sectOverride = s(A.sect).trim() !== '';
     o.sect = o.sectOverride ? s(A.sect).trim() : sc.text;       // blank override = auto from the route
     o.I1 = I1; o.I2 = I2; o.I3 = I3;

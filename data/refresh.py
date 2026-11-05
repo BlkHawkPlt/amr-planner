@@ -41,10 +41,10 @@ def urls(c):
     d = dt.date.fromisoformat(c['nasr']); tag = f"{d.day:02d}_{d.strftime('%b')}_{d.year}"
     return [f'https://nfdc.faa.gov/webContent/28DaySub/extra/{tag}_{k}_CSV.zip' for k in ('APT', 'FRQ', 'DP', 'AWOS')] + [f"https://aeronav.faa.gov/d-tpp/{c['tpp']}/xml_data/d-TPP_Metafile.xml"]
 
-SCHEMA = 5        # bump when build_data.py output changes shape; forces already-shipped cycles to be rebuilt
+SCHEMA = 7        # bump when build_data.py output changes shape; forces already-shipped cycles to be rebuilt
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--states'); ap.add_argument('--now'); ap.add_argument('--dry-run', action='store_true')
+    ap = argparse.ArgumentParser(); ap.add_argument('--force', action='store_true'); ap.add_argument('--states'); ap.add_argument('--now'); ap.add_argument('--dry-run', action='store_true'); ap.add_argument('--reuse-raw', action='store_true', help='rebuild from data/raw if it is already downloaded')
     a = ap.parse_args()
     cfg = json.load(open(os.path.join(HERE, 'config.json')))
     states = a.states.split(',') if a.states and a.states.upper() != 'ALL' else (['ALL'] if a.states else cfg['states'])
@@ -60,14 +60,17 @@ def main():
         have_it = c['tpp'] in have
         want_states = None if allst else states
         if have_it and not a.force and not stale:
-            same = allst and len(have[c['tpp']]['states']) > 20 or (not allst and set(states) <= set(have[c['tpp']]['states']))
+            same = allst and len(have[c['tpp']]['states']) > 20 and bool(have[c['tpp']].get('index')) or (not allst and set(states) <= set(have[c['tpp']]['states']))
             if same: print(c['tpp'], 'already shipped'); continue
         ok = all(posted(u) for u in urls(c))
         if not ok: print(c['tpp'], 'not (fully) posted by the FAA yet -> skip'); continue
         print(c['tpp'], 'posted; building' + (' (dry run)' if a.dry_run else ''))
         if a.dry_run: built[c['tpp']] = None; continue
         raw = os.path.join(HERE, 'raw', c['nasr']); out = os.path.join(HERE, 'out', c['tpp'])
-        subprocess.check_call([sys.executable, os.path.join(HERE, 'fetch_data.py'), '--nasr', c['nasr'], '--tpp', c['tpp']])
+        if a.reuse_raw and os.path.exists(os.path.join(raw, 'dtpp.xml')):
+            if not os.path.isdir(os.path.join(raw, 'to')):
+                sys.path.insert(0, HERE); import odp; odp.fetch_all(os.path.join(raw, 'dtpp.xml'), os.path.join(raw, 'to'), c['tpp'])
+        else: subprocess.check_call([sys.executable, os.path.join(HERE, 'fetch_data.py'), '--nasr', c['nasr'], '--tpp', c['tpp']])
         shutil.rmtree(out, ignore_errors=True)
         subprocess.check_call([sys.executable, os.path.join(HERE, 'build_data.py'), '--raw', raw, '--tpp-cycle', c['tpp'], '--states', 'ALL' if allst else ','.join(states), '--filter', cfg['filter'], '--out', out] + (['--cifp', os.path.join(raw, 'FAACIFP18')] if os.path.exists(os.path.join(raw, 'FAACIFP18')) else []))
         built[c['tpp']] = (c, out)
@@ -87,9 +90,9 @@ def main():
             ent = {}
             for s, info in sorted(man['states'].items()):
                 shutil.copy(os.path.join(out, 'states', f'{s}.json'), os.path.join(dst, f'{s}.json'))
-                ent[s] = dict(url=f'data/{t}/{s}.json', airports=info['airports'], pre=(s in pre) if allst else True)
+                ent[s] = dict(url=f'data/{t}/{s}.json', airports=info['airports'], gz=info['gzip'], pre=(s in pre) if allst else True)
             entry = dict(tpp=t, nasr=c['nasr'], **{'from': c['from'], 'to': c['to']}, states=ent)
-            if allst and os.path.exists(os.path.join(out, 'index.json')): shutil.copy(os.path.join(out, 'index.json'), os.path.join(dst, 'index.json')); entry['index'] = f'data/{t}/index.json'
+            if os.path.exists(os.path.join(out, 'ids.json')): shutil.copy(os.path.join(out, 'ids.json'), os.path.join(dst, 'ids.json')); entry['index'] = f'data/{t}/ids.json'      # {state: [ids]} nationwide ID -> state index
             keep[t] = entry
         for d in glob.glob(os.path.join(SITE, '[0-9][0-9][0-9][0-9]')):
             if os.path.basename(d) not in keep: shutil.rmtree(d); print('removed', d)

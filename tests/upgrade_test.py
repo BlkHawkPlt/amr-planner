@@ -5,11 +5,11 @@ For each old release (git ref): serve it (with GitHub-Pages-like Cache-Control: 
 the deploy does) and let the browser do its update check. Asserts: the open page switches to the new build by itself, old caches are gone, the
 saved mission survived, the new build serves the Plan->Scripts AWOS path. Then: a second upgrade (new -> newer) through the
 'Update available' banner when the service worker can't update, and through 'Force refresh app files'.
-   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1) 2eda131 (v1.3) eeb3041 (v1.4)"""
+   python3 upgrade_test.py [oldref ...]      default: 80b37a0 (v1.0) 24e0448 (v1.1) 2eda131 (v1.3) eeb3041 (v1.4) f8504a8 (v1.5)"""
 import sys, os, subprocess, shutil, threading, json, http.server, functools
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-refs = sys.argv[1:] or ['80b37a0', '24e0448', '2eda131', 'eeb3041']
+refs = sys.argv[1:] or ['80b37a0', '24e0448', '2eda131', 'eeb3041', 'f8504a8']
 W = '/tmp/amr_upgrade'; shutil.rmtree(W, ignore_errors=True); os.makedirs(W)
 fails = []; n = [0]
 def check(label, ok, extra=''):
@@ -57,9 +57,9 @@ with sync_playwright() as p:
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.goto(URL, wait_until='networkidle'); pg.wait_for_function('navigator.serviceWorker.controller || false', timeout=15000) if False else None
         pg.wait_for_timeout(1500); pg.reload(wait_until='networkidle'); pg.wait_for_function('!!navigator.serviceWorker.controller', timeout=15000)
-        s0 = state(pg); check(f'{ref}: old release installed + controlling, cache {s0["keys"]}', s0['ctrl'] and s0['keys'] == [f'amr-planner-old{ref}'] and (not s0['build'] or ref == '2eda131'))
+        s0 = state(pg); check(f'{ref}: old release installed + controlling, cache {s0["keys"]}', s0['ctrl'] and s0['keys'] == [f'amr-planner-old{ref}'] and (not s0['build'] or ref in ('2eda131', 'eeb3041', 'f8504a8')))   # releases from 1.3 on carry a build stamp (unstamped source says 'dev')
         # the user's saved mission in the OLD storage format (flight-plan key f175 in the old releases)
-        pg.evaluate("""() => { localStorage.setItem('amr.current.v1', JSON.stringify({ date: '2026-10-29', dep: { id: 'KTUS' }, d1: { id: 'KRYN', wx: 'AWOS' }, d2: { id: 'KDMA' }, f175: { etd: '2145', tas: '105' } })); }""")
+        pg.evaluate("""() => { localStorage.setItem('amr.current.v1', JSON.stringify({ date: '2026-10-29', dep: { id: 'KTUS' }, d1: { id: 'KRYN', wx: 'AWOS' }, d2: { id: 'KDMA' }, f175: { etd: '2145', tas: '105' } })); localStorage.setItem('amr.missions.v1', JSON.stringify({ 'PA sim': { date: '2026-10-30', saved: '2026-10-30T00:00:00Z', dep: { id: 'KMDT' }, d1: { id: 'KLNS' }, d2: { id: 'KMDT' } } })); }""")
         pg.reload(wait_until='networkidle'); pg.wait_for_timeout(800)
         # ship the new release; the browser's update check (done at every app launch) finds the new sw.js
         swap(NEW); pg.evaluate("navigator.serviceWorker.getRegistration().then(r => r.update())")
@@ -70,6 +70,10 @@ with sync_playwright() as p:
             s1 = state(pg)
             check(f'{ref}: old caches deleted, only the new cache remains', s1['keys'] == ['amr-planner-newtest01'], str(s1['keys']))
             check(f'{ref}: saved mission survived and migrated (wx AWOS, ETD 2145, TAS 105, flight-plan key now fp)', pg.evaluate("[__amr.S.m.d1.wx, __amr.S.m.fp.etd, __amr.S.m.fp.tas, 'f175' in __amr.S.m]") == ['AWOS', '2145', '105', False])
+            # v1.6: nationwide data - an existing install keeps AZ + PA (no first-run picker), its states stay cached for offline use, saved missions untouched
+            check(f'{ref}: v1.6 keeps AZ + PA selected, no welcome picker', pg.evaluate("[__amr.S.settings.states.slice().sort().join(), document.getElementById('welcome').hidden, __amr.D.loadedStates().slice().sort().join()]") == ['AZ,PA', True, 'AZ,PA'], pg.evaluate("[__amr.S.settings.states, document.getElementById('welcome').hidden, __amr.D.loadedStates()]"))
+            check(f'{ref}: the AZ and PA files are in the new cache (offline works) next to the ID index', pg.evaluate("async () => { const c = await caches.open('amr-planner-newtest01'); const ks = (await c.keys()).map(r => new URL(r.url).pathname); return [ks.some(k => /data\\/\\d+\\/AZ\\.json$/.test(k)), ks.some(k => /data\\/\\d+\\/PA\\.json$/.test(k)), ks.some(k => /ids\\.json$/.test(k))]; }") == [True, True, True])
+            check(f'{ref}: saved missions survive and open (PA mission still resolves)', pg.evaluate("async () => { const ms = JSON.parse(localStorage.getItem('amr.missions.v1')); return Object.keys(ms).join() + ' ' + !!__amr.D.ap('KMDT'); }") == 'PA sim true')
             pg.click('#tabs [data-tab="scripts"]'); pg.wait_for_timeout(500); t = pg.inner_text('#view-scripts')
             check(f'{ref}: Scripts after upgrade use the saved AWOS choice', 'one-minute weather' in t)
             pg.click('#tabs [data-tab="info"]'); pg.wait_for_timeout(300); it = pg.inner_text('#view-info')
@@ -80,7 +84,7 @@ with sync_playwright() as p:
         ctx.close()
 
     print('\n=== new -> newer through the "Update available" banner (service worker cannot update) ===')
-    swap(NEW); ctx = b.new_context(viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True); pg = ctx.new_page()
+    swap(NEW); ctx = b.new_context(viewport={'width': 390, 'height': 844}, has_touch=True, is_mobile=True); ctx.add_init_script("if(!localStorage.getItem('amr.settings.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true}))"); pg = ctx.new_page()
     pg.goto(URL, wait_until='networkidle'); pg.wait_for_timeout(1200); pg.reload(wait_until='networkidle'); wait_build(pg, 'newtest01')
     pg.evaluate("__amr.S.m.fp.etd = '2230'; __amr.S.m.scriptOpts.voidMin = '40'; localStorage.setItem('amr.current.v1', JSON.stringify(__amr.S.m))")
     pg.route('**/sw.js', lambda r: r.abort())          # simulate a device whose browser fails to fetch the new worker

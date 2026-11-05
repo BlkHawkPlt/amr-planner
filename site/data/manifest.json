@@ -6,19 +6,715 @@
    "from": "2026-10-29T09:01Z",
    "to": "2026-11-26T09:01Z",
    "states": {
+    "AK": {
+     "url": "data/2611/AK.json",
+     "airports": 363,
+     "gz": 46962,
+     "pre": false
+    },
+    "AL": {
+     "url": "data/2611/AL.json",
+     "airports": 236,
+     "gz": 28562,
+     "pre": false
+    },
+    "AR": {
+     "url": "data/2611/AR.json",
+     "airports": 185,
+     "gz": 20597,
+     "pre": false
+    },
+    "AS": {
+     "url": "data/2611/AS.json",
+     "airports": 3,
+     "gz": 900,
+     "pre": false
+    },
     "AZ": {
      "url": "data/2611/AZ.json",
      "airports": 200,
-     "pre": true
+     "gz": 23093,
+     "pre": false
+    },
+    "CA": {
+     "url": "data/2611/CA.json",
+     "airports": 651,
+     "gz": 84397,
+     "pre": false
+    },
+    "CO": {
+     "url": "data/2611/CO.json",
+     "airports": 246,
+     "gz": 28252,
+     "pre": false
+    },
+    "CT": {
+     "url": "data/2611/CT.json",
+     "airports": 64,
+     "gz": 7339,
+     "pre": false
+    },
+    "DC": {
+     "url": "data/2611/DC.json",
+     "airports": 15,
+     "gz": 3711,
+     "pre": false
+    },
+    "DE": {
+     "url": "data/2611/DE.json",
+     "airports": 21,
+     "gz": 3075,
+     "pre": false
+    },
+    "FL": {
+     "url": "data/2611/FL.json",
+     "airports": 527,
+     "gz": 61955,
+     "pre": false
+    },
+    "GA": {
+     "url": "data/2611/GA.json",
+     "airports": 240,
+     "gz": 32999,
+     "pre": false
+    },
+    "GU": {
+     "url": "data/2611/GU.json",
+     "airports": 3,
+     "gz": 1204,
+     "pre": false
+    },
+    "HI": {
+     "url": "data/2611/HI.json",
+     "airports": 32,
+     "gz": 7115,
+     "pre": false
+    },
+    "IA": {
+     "url": "data/2611/IA.json",
+     "airports": 207,
+     "gz": 24530,
+     "pre": false
+    },
+    "ID": {
+     "url": "data/2611/ID.json",
+     "airports": 178,
+     "gz": 15350,
+     "pre": false
+    },
+    "IL": {
+     "url": "data/2611/IL.json",
+     "airports": 333,
+     "gz": 36842,
+     "pre": false
+    },
+    "IN": {
+     "url": "data/2611/IN.json",
+     "airports": 213,
+     "gz": 26748,
+     "pre": false
+    },
+    "KS": {
+     "url": "data/2611/KS.json",
+     "airports": 183,
+     "gz": 24740,
+     "pre": false
+    },
+    "KY": {
+     "url": "data/2611/KY.json",
+     "airports": 180,
+     "gz": 20364,
+     "pre": false
+    },
+    "LA": {
+     "url": "data/2611/LA.json",
+     "airports": 249,
+     "gz": 25009,
+     "pre": false
+    },
+    "MA": {
+     "url": "data/2611/MA.json",
+     "airports": 135,
+     "gz": 15872,
+     "pre": false
+    },
+    "MD": {
+     "url": "data/2611/MD.json",
+     "airports": 101,
+     "gz": 12759,
+     "pre": false
+    },
+    "ME": {
+     "url": "data/2611/ME.json",
+     "airports": 105,
+     "gz": 12638,
+     "pre": false
+    },
+    "MI": {
+     "url": "data/2611/MI.json",
+     "airports": 357,
+     "gz": 40189,
+     "pre": false
+    },
+    "MN": {
+     "url": "data/2611/MN.json",
+     "airports": 248,
+     "gz": 31731,
+     "pre": false
+    },
+    "MO": {
+     "url": "data/2611/MO.json",
+     "airports": 254,
+     "gz": 30367,
+     "pre": false
+    },
+    "MP": {
+     "url": "data/2611/MP.json",
+     "airports": 5,
+     "gz": 1264,
+     "pre": false
+    },
+    "MS": {
+     "url": "data/2611/MS.json",
+     "airports": 129,
+     "gz": 17558,
+     "pre": false
+    },
+    "MT": {
+     "url": "data/2611/MT.json",
+     "airports": 168,
+     "gz": 19095,
+     "pre": false
+    },
+    "NC": {
+     "url": "data/2611/NC.json",
+     "airports": 260,
+     "gz": 34923,
+     "pre": false
+    },
+    "ND": {
+     "url": "data/2611/ND.json",
+     "airports": 108,
+     "gz": 13508,
+     "pre": false
+    },
+    "NE": {
+     "url": "data/2611/NE.json",
+     "airports": 115,
+     "gz": 18731,
+     "pre": false
+    },
+    "NH": {
+     "url": "data/2611/NH.json",
+     "airports": 121,
+     "gz": 9769,
+     "pre": false
+    },
+    "NJ": {
+     "url": "data/2611/NJ.json",
+     "airports": 216,
+     "gz": 21637,
+     "pre": false
+    },
+    "NM": {
+     "url": "data/2611/NM.json",
+     "airports": 98,
+     "gz": 14364,
+     "pre": false
+    },
+    "NV": {
+     "url": "data/2611/NV.json",
+     "airports": 112,
+     "gz": 13164,
+     "pre": false
+    },
+    "NY": {
+     "url": "data/2611/NY.json",
+     "airports": 268,
+     "gz": 35067,
+     "pre": false
+    },
+    "OH": {
+     "url": "data/2611/OH.json",
+     "airports": 335,
+     "gz": 37734,
+     "pre": false
+    },
+    "OK": {
+     "url": "data/2611/OK.json",
+     "airports": 225,
+     "gz": 24419,
+     "pre": false
+    },
+    "OR": {
+     "url": "data/2611/OR.json",
+     "airports": 188,
+     "gz": 20933,
+     "pre": false
     },
     "PA": {
      "url": "data/2611/PA.json",
      "airports": 393,
-     "pre": true
+     "gz": 42514,
+     "pre": false
+    },
+    "PR": {
+     "url": "data/2611/PR.json",
+     "airports": 40,
+     "gz": 4386,
+     "pre": false
+    },
+    "RI": {
+     "url": "data/2611/RI.json",
+     "airports": 19,
+     "gz": 3307,
+     "pre": false
+    },
+    "SC": {
+     "url": "data/2611/SC.json",
+     "airports": 121,
+     "gz": 19567,
+     "pre": false
+    },
+    "SD": {
+     "url": "data/2611/SD.json",
+     "airports": 112,
+     "gz": 12955,
+     "pre": false
+    },
+    "TN": {
+     "url": "data/2611/TN.json",
+     "airports": 186,
+     "gz": 24708,
+     "pre": false
+    },
+    "TX": {
+     "url": "data/2611/TX.json",
+     "airports": 864,
+     "gz": 108288,
+     "pre": false
+    },
+    "UM": {
+     "url": "data/2611/UM.json",
+     "airports": 2,
+     "gz": 621,
+     "pre": false
+    },
+    "UT": {
+     "url": "data/2611/UT.json",
+     "airports": 129,
+     "gz": 14890,
+     "pre": false
+    },
+    "VA": {
+     "url": "data/2611/VA.json",
+     "airports": 202,
+     "gz": 26846,
+     "pre": false
+    },
+    "VI": {
+     "url": "data/2611/VI.json",
+     "airports": 3,
+     "gz": 1109,
+     "pre": false
+    },
+    "VT": {
+     "url": "data/2611/VT.json",
+     "airports": 38,
+     "gz": 4854,
+     "pre": false
+    },
+    "WA": {
+     "url": "data/2611/WA.json",
+     "airports": 262,
+     "gz": 27937,
+     "pre": false
+    },
+    "WI": {
+     "url": "data/2611/WI.json",
+     "airports": 230,
+     "gz": 29709,
+     "pre": false
+    },
+    "WV": {
+     "url": "data/2611/WV.json",
+     "airports": 72,
+     "gz": 10774,
+     "pre": false
+    },
+    "WY": {
+     "url": "data/2611/WY.json",
+     "airports": 67,
+     "gz": 11300,
+     "pre": false
+    },
+    "XX": {
+     "url": "data/2611/XX.json",
+     "airports": 137,
+     "gz": 7474,
+     "pre": false
     }
-   }
+   },
+   "index": "data/2611/ids.json"
+  },
+  {
+   "tpp": "2612",
+   "nasr": "2026-11-26",
+   "from": "2026-11-26T09:01Z",
+   "to": "2026-12-24T09:01Z",
+   "states": {
+    "AK": {
+     "url": "data/2612/AK.json",
+     "airports": 363,
+     "gz": 46954,
+     "pre": false
+    },
+    "AL": {
+     "url": "data/2612/AL.json",
+     "airports": 236,
+     "gz": 28566,
+     "pre": false
+    },
+    "AR": {
+     "url": "data/2612/AR.json",
+     "airports": 185,
+     "gz": 20601,
+     "pre": false
+    },
+    "AS": {
+     "url": "data/2612/AS.json",
+     "airports": 3,
+     "gz": 899,
+     "pre": false
+    },
+    "AZ": {
+     "url": "data/2612/AZ.json",
+     "airports": 200,
+     "gz": 23092,
+     "pre": false
+    },
+    "CA": {
+     "url": "data/2612/CA.json",
+     "airports": 651,
+     "gz": 84400,
+     "pre": false
+    },
+    "CO": {
+     "url": "data/2612/CO.json",
+     "airports": 246,
+     "gz": 28222,
+     "pre": false
+    },
+    "CT": {
+     "url": "data/2612/CT.json",
+     "airports": 64,
+     "gz": 7338,
+     "pre": false
+    },
+    "DC": {
+     "url": "data/2612/DC.json",
+     "airports": 15,
+     "gz": 3713,
+     "pre": false
+    },
+    "DE": {
+     "url": "data/2612/DE.json",
+     "airports": 21,
+     "gz": 3074,
+     "pre": false
+    },
+    "FL": {
+     "url": "data/2612/FL.json",
+     "airports": 528,
+     "gz": 62020,
+     "pre": false
+    },
+    "GA": {
+     "url": "data/2612/GA.json",
+     "airports": 240,
+     "gz": 32998,
+     "pre": false
+    },
+    "GU": {
+     "url": "data/2612/GU.json",
+     "airports": 3,
+     "gz": 1204,
+     "pre": false
+    },
+    "HI": {
+     "url": "data/2612/HI.json",
+     "airports": 32,
+     "gz": 7115,
+     "pre": false
+    },
+    "IA": {
+     "url": "data/2612/IA.json",
+     "airports": 207,
+     "gz": 24528,
+     "pre": false
+    },
+    "ID": {
+     "url": "data/2612/ID.json",
+     "airports": 178,
+     "gz": 15349,
+     "pre": false
+    },
+    "IL": {
+     "url": "data/2612/IL.json",
+     "airports": 333,
+     "gz": 37627,
+     "pre": false
+    },
+    "IN": {
+     "url": "data/2612/IN.json",
+     "airports": 213,
+     "gz": 26745,
+     "pre": false
+    },
+    "KS": {
+     "url": "data/2612/KS.json",
+     "airports": 183,
+     "gz": 24740,
+     "pre": false
+    },
+    "KY": {
+     "url": "data/2612/KY.json",
+     "airports": 180,
+     "gz": 20362,
+     "pre": false
+    },
+    "LA": {
+     "url": "data/2612/LA.json",
+     "airports": 249,
+     "gz": 25008,
+     "pre": false
+    },
+    "MA": {
+     "url": "data/2612/MA.json",
+     "airports": 135,
+     "gz": 15873,
+     "pre": false
+    },
+    "MD": {
+     "url": "data/2612/MD.json",
+     "airports": 101,
+     "gz": 12756,
+     "pre": false
+    },
+    "ME": {
+     "url": "data/2612/ME.json",
+     "airports": 105,
+     "gz": 12638,
+     "pre": false
+    },
+    "MI": {
+     "url": "data/2612/MI.json",
+     "airports": 357,
+     "gz": 40189,
+     "pre": false
+    },
+    "MN": {
+     "url": "data/2612/MN.json",
+     "airports": 248,
+     "gz": 31732,
+     "pre": false
+    },
+    "MO": {
+     "url": "data/2612/MO.json",
+     "airports": 254,
+     "gz": 30366,
+     "pre": false
+    },
+    "MP": {
+     "url": "data/2612/MP.json",
+     "airports": 5,
+     "gz": 1264,
+     "pre": false
+    },
+    "MS": {
+     "url": "data/2612/MS.json",
+     "airports": 129,
+     "gz": 17558,
+     "pre": false
+    },
+    "MT": {
+     "url": "data/2612/MT.json",
+     "airports": 168,
+     "gz": 19099,
+     "pre": false
+    },
+    "NC": {
+     "url": "data/2612/NC.json",
+     "airports": 261,
+     "gz": 34979,
+     "pre": false
+    },
+    "ND": {
+     "url": "data/2612/ND.json",
+     "airports": 109,
+     "gz": 13544,
+     "pre": false
+    },
+    "NE": {
+     "url": "data/2612/NE.json",
+     "airports": 115,
+     "gz": 18730,
+     "pre": false
+    },
+    "NH": {
+     "url": "data/2612/NH.json",
+     "airports": 121,
+     "gz": 9770,
+     "pre": false
+    },
+    "NJ": {
+     "url": "data/2612/NJ.json",
+     "airports": 216,
+     "gz": 21637,
+     "pre": false
+    },
+    "NM": {
+     "url": "data/2612/NM.json",
+     "airports": 98,
+     "gz": 14363,
+     "pre": false
+    },
+    "NV": {
+     "url": "data/2612/NV.json",
+     "airports": 112,
+     "gz": 13163,
+     "pre": false
+    },
+    "NY": {
+     "url": "data/2612/NY.json",
+     "airports": 268,
+     "gz": 35067,
+     "pre": false
+    },
+    "OH": {
+     "url": "data/2612/OH.json",
+     "airports": 336,
+     "gz": 37766,
+     "pre": false
+    },
+    "OK": {
+     "url": "data/2612/OK.json",
+     "airports": 226,
+     "gz": 24488,
+     "pre": false
+    },
+    "OR": {
+     "url": "data/2612/OR.json",
+     "airports": 188,
+     "gz": 20931,
+     "pre": false
+    },
+    "PA": {
+     "url": "data/2612/PA.json",
+     "airports": 393,
+     "gz": 42491,
+     "pre": false
+    },
+    "PR": {
+     "url": "data/2612/PR.json",
+     "airports": 40,
+     "gz": 4388,
+     "pre": false
+    },
+    "RI": {
+     "url": "data/2612/RI.json",
+     "airports": 19,
+     "gz": 3313,
+     "pre": false
+    },
+    "SC": {
+     "url": "data/2612/SC.json",
+     "airports": 122,
+     "gz": 19638,
+     "pre": false
+    },
+    "SD": {
+     "url": "data/2612/SD.json",
+     "airports": 113,
+     "gz": 12991,
+     "pre": false
+    },
+    "TN": {
+     "url": "data/2612/TN.json",
+     "airports": 186,
+     "gz": 24709,
+     "pre": false
+    },
+    "TX": {
+     "url": "data/2612/TX.json",
+     "airports": 864,
+     "gz": 108286,
+     "pre": false
+    },
+    "UM": {
+     "url": "data/2612/UM.json",
+     "airports": 2,
+     "gz": 620,
+     "pre": false
+    },
+    "UT": {
+     "url": "data/2612/UT.json",
+     "airports": 129,
+     "gz": 14892,
+     "pre": false
+    },
+    "VA": {
+     "url": "data/2612/VA.json",
+     "airports": 202,
+     "gz": 26848,
+     "pre": false
+    },
+    "VI": {
+     "url": "data/2612/VI.json",
+     "airports": 3,
+     "gz": 1109,
+     "pre": false
+    },
+    "VT": {
+     "url": "data/2612/VT.json",
+     "airports": 37,
+     "gz": 4797,
+     "pre": false
+    },
+    "WA": {
+     "url": "data/2612/WA.json",
+     "airports": 262,
+     "gz": 27938,
+     "pre": false
+    },
+    "WI": {
+     "url": "data/2612/WI.json",
+     "airports": 230,
+     "gz": 31038,
+     "pre": false
+    },
+    "WV": {
+     "url": "data/2612/WV.json",
+     "airports": 73,
+     "gz": 10818,
+     "pre": false
+    },
+    "WY": {
+     "url": "data/2612/WY.json",
+     "airports": 67,
+     "gz": 11298,
+     "pre": false
+    },
+    "XX": {
+     "url": "data/2612/XX.json",
+     "airports": 137,
+     "gz": 7473,
+     "pre": false
+    }
+   },
+   "index": "data/2612/ids.json"
   }
  ],
  "filter": "training",
- "schema": 5
+ "schema": 7
 }

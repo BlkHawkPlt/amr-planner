@@ -124,7 +124,7 @@ const ho = (m, k, mode) => M.handoff(m, k, env, mode || 'dep');
   ok('f175 -> fp still works and a new-format mission is untouched', M.migrate({ f175: { etd: '2100' } }).m.fp.etd === '2100' && M.migrate({ acft: 'UH-72', device: '78730' }).notes.length === 0);
   ok('no colour labels or TH-67 left in the data', !env.static.devices.some(d => /[A-Z]{3,}/.test(d.device)) && env.static.acft.map(a => a.design).join() === 'UH-72,UH-60L,UH-60M' && !JSON.stringify(env.static).includes('TH-67'));
   ok('serial number from tail / typed serial', M.serNum({ device: '78730' }, env) === 'R-78730' && M.serNum({ device: '87-24650' }, env) === '87-24650' && M.serNum({ device: '' }, env) === '99-12345');
-  const d = M.defaultMission('2026-10-28'); ok('defaults: KRYN is not forced, tail 78724, control AUTO', d.device === '78724' && d.dep.ctl === 'AUTO' && d.dep.cdm === 'PHONE' && d.dep.ho === 'AUTO' && d.dep.id === '02AZ');
+  const d = M.defaultMission('2026-10-28'); ok('defaults: KRYN is not forced, tail 78724, control AUTO', d.device === '78724' && d.dep.ctl === 'AUTO' && d.dep.cdm === 'PHONE' && d.dep.ho === 'AUTO' && d.dep.id === 'KPHX' && d.d1.id === 'KTUS' && d.d2.id === 'KRYN' && !d.amr.crew[0].name);
 }
 
 console.log(n + ' v1.3 checks, ' + f + ' failures'); process.exit(f ? 1 : 0);

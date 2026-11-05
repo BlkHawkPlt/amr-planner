@@ -88,3 +88,10 @@ details.inp>summary.h2{font-size:17px;font-weight:700;color:var(--ink);list-styl
 .updbar{position:sticky;top:0;z-index:30;background:#1b5e20;color:#fff;padding:8px 12px;display:flex;gap:10px;align-items:center;justify-content:center;font-size:14px}.updbar[hidden]{display:none}
 .f[hidden]{display:none!important}
 .f label .stsel{float:right;width:auto;min-height:26px;height:26px;padding:0 6px;font-size:12px;text-transform:none;font-weight:600;letter-spacing:0}
+
+/* v1.6 state picker */
+.stgrid{display:grid;grid-template-columns:1fr;gap:4px;margin:2px 0 6px}@media(min-width:560px){.stgrid{grid-template-columns:1fr 1fr}}
+.stc{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;min-height:44px;background:#fff;cursor:pointer}
+.stc input{width:22px;height:22px;flex:none}.stc small{display:block;color:var(--mut);font-size:12px}.stc em{font-style:normal;color:var(--ok)}
+#stCard h4,#welcome h4{margin:10px 0 2px;font-size:12px;text-transform:uppercase;color:var(--mut);letter-spacing:.04em}
+#welcome{z-index:60}#welcome .box{max-height:92vh}

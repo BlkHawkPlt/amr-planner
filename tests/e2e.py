@@ -10,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); SHOTS = os.path.join(HERE, '.
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8765/index.html'
 SC = json.load(open(HERE + '/wb_run/scenarios.json'))['S1_KTUS_KRYN_KDMA']
 WB = openpyxl.load_workbook(HERE + '/wb_run/out/S1_KTUS_KRYN_KDMA.xlsx', data_only=True)
+PRESET = "if(!localStorage.getItem('amr.settings.v1')&&!localStorage.getItem('amr.current.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true%s}))"   # v1.6: first run asks for states
 def w(sheet, ref):
     v = WB[sheet][ref].value
     if isinstance(v, float) and v == int(v): v = int(v)
@@ -44,8 +45,7 @@ def pick(page, path, ident):
 def run(name, vp):
     with sync_playwright() as p:
         b = p.chromium.launch(channel='chrome', args=['--no-sandbox'])
-        ctx = b.new_context(viewport=vp, device_scale_factor=2 if name == 'iphone' else 1, has_touch=name != 'ipad-pro', is_mobile=name == 'iphone', service_workers='allow')
-        if COMPAT: ctx.add_init_script("if(!localStorage.getItem('amr.settings.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({compat:true}))")
+        ctx = b.new_context(viewport=vp, device_scale_factor=2 if name == 'iphone' else 1, has_touch=name != 'ipad-pro', is_mobile=name == 'iphone', service_workers='allow'); ctx.add_init_script(PRESET % (',compat:true' if COMPAT else ''))
         pg = ctx.new_page(); errs = []
         pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
         pg.goto(URL); pg.wait_for_selector('body[data-ready="1"]')
@@ -84,7 +84,9 @@ def run(name, vp):
         check(f'[{name}] AMR mission = workbook AMR!A4', P['MISSION'], w('AMR', 'A4'))
         check(f'[{name}] AMR special instructions = AMR!A7', P['Special Instructions'], w('AMR', 'A7'))
         txt = pg.inner_text('#view-amr')
-        for lab, ref in (('Serial Number:', 'C14'), ('Planning Fuel:', 'C16'), ('Hover Power:', 'C21'), ('Climb Power:', 'C22'), ('Cruise Power:', 'C23'), ('Fuel Burn Rate:', 'C24'), ('IAP:', 'C42'), ('Gross Weight:', 'C15')):
+        iap = re.search(r'IAP:\s*(.*)', txt).group(1); vols = [v.strip() for v in str(w('AMR', 'C42')).split(',') if v.strip()]
+        check(f'[{name}] AMR IAP row lists the workbook volume(s) {vols} (v1.6 adds the dep volume + chosen plates)', all(v in iap for v in vols), True)
+        for lab, ref in (('Serial Number:', 'C14'), ('Planning Fuel:', 'C16'), ('Hover Power:', 'C21'), ('Climb Power:', 'C22'), ('Cruise Power:', 'C23'), ('Fuel Burn Rate:', 'C24'), ('Gross Weight:', 'C15')):
             m = re.search(re.escape(lab) + r'\s*(.*)', txt); check(f'[{name}] AMR {lab} = AMR!{ref}', m.group(1) if m else None, w('AMR', ref))
         check(f'[{name}] AMR aircraft/design', re.search(r'Aircraft:\s*(.*)', txt).group(1).replace('\xa0', ' ').replace('  ', ' '), 'UH-72 ' + w('AMR', 'C13'))
         pg.screenshot(path=f'{SHOTS}/{name}_amr.png', full_page=True)
@@ -134,7 +136,7 @@ def run(name, vp):
         # 6) save / load named missions
         pg.click('#btnMissions'); pg.fill('#mName', 'e2e KTUS-KRYN-KDMA'); pg.click('[data-m="save"]'); pg.wait_for_timeout(100)
         pg.click('[data-m="new"]'); pg.wait_for_timeout(300)
-        check(f'[{name}] new mission resets', pg.evaluate('__amr.S.m.dep.id'), '02AZ')
+        check(f'[{name}] new mission resets', pg.evaluate('__amr.S.m.dep.id'), 'KPHX')
         pg.click('#btnMissions'); pg.click('[data-m="load"]'); pg.wait_for_timeout(300)
         check(f'[{name}] named mission loads', pg.evaluate('__amr.S.m.d2.id + "|" + __amr.S.m.d2.apr'), 'KDMA|' + SC['d2']['apr'])
         pg.screenshot(path=f'{SHOTS}/{name}_missions_loaded.png')

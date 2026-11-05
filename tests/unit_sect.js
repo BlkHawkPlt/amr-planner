@@ -41,7 +41,7 @@ o = M.amr(mission('KRYN', 'KMZJ', 'KTUS', '', m => { delete m.amr.sect; }), env)
 // Plan change -> AMR (single source of truth)
 const m = mission('KRYN', 'KMZJ', 'KTUS'); eq('before', M.amr(m, env).sect, 'PHOENIX'); m.d1.id = 'KMDT'; eq('after changing destination 1 to KMDT', M.amr(m, env).sect, 'PHOENIX, NEW YORK');
 // ---- other behaviour untouched
-o = M.amr(mission('KRYN', 'KMZJ', 'KTUS'), env); ok('IAP line and ELA unchanged', typeof o.iap === 'string' && o.iap.length > 0 && o.ela === m.amr.ela);
+o = M.amr(mission('KRYN', 'KMZJ', 'KTUS'), env); ok('IAP line and ELA present (v1.6: both auto-filled, see unit_pubs.js)', typeof o.iap === 'string' && o.iap.length > 0 && o.ela === 'L-5');
 // ---- v1.5 taxi wording: plain ground taxi, never hover / air taxi (towered and uncontrolled, every mission, every output text)
 [['KRYN', 'KMZJ', 'KTUS'], ['KMZJ', 'KTUS', 'KRYN'], ['KMDT', 'KTHV', 'KPHL'], ['KTHV', 'KPHL', 'KMDT'], ['KMUI', 'KRDG', 'KLNS']].forEach(r => {
   ['AUTO', 'TWR', 'CTAF'].forEach(ctl => {

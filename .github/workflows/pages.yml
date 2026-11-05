@@ -18,6 +18,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with: { ref: main, fetch-depth: 0 }      # upgrade_test.py builds the old releases from git history

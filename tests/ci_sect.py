@@ -4,6 +4,7 @@ iPhone + iPad viewports.   python3 ci_sect.py [base_url] [--shots DIR]"""
 import sys, os
 args = [a for a in sys.argv[1:] if a.startswith('http')]
 SHOTS = sys.argv[sys.argv.index('--shots') + 1] if '--shots' in sys.argv else None
+PRESET = "if(!localStorage.getItem('amr.settings.v1')&&!localStorage.getItem('amr.current.v1')) localStorage.setItem('amr.settings.v1', JSON.stringify({states:['AZ','PA'],welcomed:true}))"   # v1.6: first run asks for states; the AZ/PA suites start with them chosen
 BASE = (args[0] if args else 'http://localhost:8765/').rstrip('/') + '/'
 sys.argv = ['x', BASE]
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -32,7 +33,7 @@ def shot_amr_pubs(pg, tag, name):
 with sync_playwright() as p:
     b = p.chromium.launch(channel='chrome', args=['--no-sandbox']) if os.environ.get('PW_CHANNEL', 'chrome') == 'chrome' else p.chromium.launch(args=['--no-sandbox'])
     for tag, kw in VIEWS.items():
-        ctx = b.new_context(**kw); pg = ctx.new_page(); pg.set_default_timeout(15000); errs = []
+        ctx = b.new_context(**kw); ctx.add_init_script(PRESET); pg = ctx.new_page(); pg.set_default_timeout(15000); errs = []
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.goto(BASE, wait_until='networkidle'); pg.wait_for_function('window.__amr && __amr.S && __amr.S.m'); pg.evaluate('localStorage.clear()'); pg.reload(wait_until='networkidle'); pg.wait_for_function('window.__amr && __amr.S && __amr.S.m')
         E.go_plan(pg)
