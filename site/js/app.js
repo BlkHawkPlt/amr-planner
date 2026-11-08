@@ -575,6 +575,18 @@
     const need = new Set(S.settings.states || []); missionStates(S.m).forEach(st => need.add(st));
     await D.loadStates(Array.from(need)); D.stFilter = S.settings.stFilter || 'ALL'; afterLoad();
   }
+  /* First visit: boot() fetched the chosen states BEFORE the service worker controlled the page, so those requests bypassed its cache (every state is "pre": false).
+     Once the worker controls the page, fetch the loaded states again through it - in every cycle of the manifest, as the worker's install does for carried-over states -
+     so an offline reload does not depend on the browser's HTTP cache (GitHub Pages sends max-age=600; a CI runner's fresh checkout has none). */
+  async function warmOffline() {
+    try {
+      const sw = navigator.serviceWorker; await sw.ready;
+      if (!sw.controller) await new Promise(res => { sw.addEventListener('controllerchange', res, { once: true }); setTimeout(res, 8000); });
+      if (!sw.controller) return;
+      const urls = []; D.manifest.cycles.forEach(cy => Object.keys(D.loaded).forEach(st => { if (cy.states[st]) urls.push(cy.states[st].url); }));
+      await Promise.all(urls.map(u => fetch(u).then(r => r.arrayBuffer()).catch(() => { })));      // read each body to the end: an unread response keeps the request open
+    } catch (e) { /* offline copies are filled on first use instead */ }
+  }
   async function setStates(list) {                             // download the newly ticked states (the service worker keeps them offline), drop the unticked ones
     const old = S.settings.states || [], add = list.filter(x => old.indexOf(x) < 0), rem = old.filter(x => list.indexOf(x) < 0), keep = missionStates(S.m);
     S.settings.states = list.slice(); jset(LS.settings, S.settings);
@@ -767,6 +779,7 @@
     $('#view-plan').innerHTML = planHTML(); afterPlan(); wire();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => { });
+      warmOffline();
     }
     watchUpdates();
     if (!S.settings.welcomed) openWelcome();
