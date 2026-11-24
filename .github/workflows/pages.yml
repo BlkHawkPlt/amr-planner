@@ -3,6 +3,8 @@ name: Test and deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:           # test only: the deploy job below is skipped for pull requests
+    branches: [main]
   workflow_dispatch:
   workflow_call:          # called by refresh.yml after it commits new FAA data
 
@@ -11,9 +13,9 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
+concurrency:                       # pull requests get their own group (and supersede their own older runs) so they can never displace a pending deploy
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -21,7 +23,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-        with: { ref: main, fetch-depth: 0 }      # upgrade_test.py builds the old releases from git history
+        with:      # the PR's own commit on pull requests; main otherwise (also when called from refresh.yml)
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+          fetch-depth: 0               # upgrade_test.py builds the old releases from git history
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - uses: actions/setup-python@v5
@@ -35,6 +39,7 @@ jobs:
 
   deploy:
     needs: test                     # a failing test skips the deploy
+    if: github.event_name != 'pull_request'     # pull requests are tested, never deployed
     runs-on: ubuntu-latest
     environment:
       name: github-pages
