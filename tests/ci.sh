@@ -12,7 +12,7 @@ node unit_sect.js
 node unit_pubs.js    # v1.6: ELA / approach plates / textual ODP, nationwide samples
 python3 form_fidelity.py
 python3 data_sanity.py
-(cd ../site && python3 -m http.server 8799 --bind 127.0.0.1 >/dev/null 2>&1 & echo $! > /tmp/amr_ci_srv.pid)
+(python3 serve_nostore.py ../site 8799 >/dev/null 2>&1 & echo $! > /tmp/amr_ci_srv.pid)      # no-store: the offline checks must not be answered by the browser's HTTP cache
 trap 'kill $(cat /tmp/amr_ci_srv.pid) 2>/dev/null || true' EXIT
 sleep 1
 python3 ci_ui.py http://127.0.0.1:8799/

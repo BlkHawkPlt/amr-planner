@@ -115,9 +115,17 @@ with sync_playwright() as p:
     t = pg.inner_text('#view-amr'); check('AMR shows the three airports', all(x in t for x in ('(TUS)', '(RYN)', '(DMA)')))
     if SHOTS: pg.screenshot(path=f'{SHOTS}/live_iphone_amr.png', full_page=True)
     suite(pg, 'iphone')
+    # offline readiness: await the app's own warm-up signal (no fixed delay), then add a state AFTER boot and wait until its file is in the cache
+    warmed = pg.evaluate('__amr.warmed'); check('offline warm-up finished and cached the loaded states', isinstance(warmed, int) and warmed >= 2, str(warmed))
+    pg.evaluate("__amr.setStates(['AZ','PA','NY'])"); pg.wait_for_function("__amr.D.loadedStates().includes('NY')", timeout=15000)
+    pg.wait_for_function("__amr.D.manifest.cycles.every(c => !c.states.NY) || caches.keys().then(ks => Promise.all(ks.map(k => caches.open(k).then(c => c.match(__amr.D.manifest.cycles.find(c => c.states.NY).states.NY.url, {ignoreSearch: true}))))).then(r => r.some(Boolean))", timeout=15000)
+    check('state added after boot is cached by the service worker', True)
+    NOTICE = 'Your missions are saved only in this browser on this device. They do not automatically transfer to another computer, iPad, or phone. Clearing browser data may erase your saved missions.'
+    pg.click('#tabs [data-tab="info"]'); check('Info shows the local-storage notice (word for word)', NOTICE in pg.inner_text('#view-info').replace('\n', ' '))
+    pg.click('#btnMissions'); check('Missions dialog shows the local-storage notice (word for word)', NOTICE in pg.inner_text('#modal').replace('\n', ' ')); pg.click('#modal [data-m="close"]')
     n_on = len(errs)      # while offline the update check (version.json) cannot reach the network; the browser logs that as a console error - expected
     ctx.set_offline(True); pg.reload(); pg.wait_for_selector('body[data-ready="1"]', timeout=20000)
-    check('offline reload works (served by service worker)', pg.evaluate('!!__amr.D.ap("KTUS")') and ('cycle ' + str(exp)) in pg.inner_text('#cycBadge'))
+    check('offline reload works (served by service worker)', pg.evaluate('!!__amr.D.ap("KTUS") && __amr.D.loadedStates().includes("NY")') and ('cycle ' + str(exp)) in pg.inner_text('#cycBadge'))
     ctx.set_offline(False); errs[n_on:] = [e for e in errs[n_on:] if 'ERR_FAILED' not in e and 'ERR_INTERNET_DISCONNECTED' not in e]
     check('no console/page errors', not errs, str(errs[:3]))
     # ---- iPad (portrait) pass over the same tabs

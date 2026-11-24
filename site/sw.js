@@ -42,7 +42,7 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const c = await caches.open(CACHE), hit = await c.match(r, { ignoreSearch: true });
     if (hit) return hit;
-    try { const res = await fetch(r); if (res.ok) c.put(r, res.clone()); return res; }
+    try { const res = await fetch(r); if (res.ok) e.waitUntil(c.put(r, res.clone()).catch(() => { })); return res; }      // waitUntil: keep the worker alive until the copy is stored
     catch (err) { if (r.mode === 'navigate') return c.match('index.html'); throw err; }
   })());
 });

@@ -5,6 +5,7 @@
   const BUILD = window.AMR_BUILD || { version: '?', commit: 'dev', built: '' }, VERSION = BUILD.version;
   const $ = (s, r) => (r || document).querySelector(s), $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const STORAGE_NOTICE = 'Your missions are saved only in this browser on this device. They do not automatically transfer to another computer, iPad, or phone. Clearing browser data may erase your saved missions.';
   const LS = { cur: 'amr.current.v1', missions: 'amr.missions.v1', settings: 'amr.settings.v1' };
   const S = { m: null, settings: { cycle: 'auto', compat: false, states: null, welcomed: true, stFilter: 'ALL', legacy175: false }, tab: 'plan', sub: '1801', dirtyPlan: false };
   const env = { ap: id => D.ap(id), acft: d => D.acft(d), device: d => D.device(d), get compat() { return S.settings.compat; } };
@@ -506,7 +507,7 @@
       <div class="f chk"><input type="checkbox" id="legacy175" ${S.settings.legacy175 ? 'checked' : ''}><label for="legacy175">Show legacy DD 175 (the DD 1801 is the flight plan)</label></div>
       <div class="f chk"><input type="checkbox" id="compat" ${S.settings.compat ? 'checked' : ''}><label for="compat">Workbook-compatible mode (reproduce workbook quirks)</label></div>
       <p class="fx">Off (default): density altitude uses the correct formula, the ATIS "Landing and Departing RWY…" line is dropped when the approach is to the runway in use, and Destination 1's pressure altitude uses Destination 1's elevation. On: the original workbook formulas are reproduced exactly (misplaced-parenthesis density altitude, always adding the landing-RWY sentence for numeric runways, departure elevation for Dest 1).</p>
-      <h3>Data on this device</h3><button class="btn danger sm" id="btnWipe">Erase saved missions &amp; settings</button></section>
+      <h3>Data on this device</h3><p class="fx" id="storeNote">${esc(STORAGE_NOTICE)}</p><button class="btn danger sm" id="btnWipe">Erase saved missions &amp; settings</button></section>
     <section class="card"><h2>Weather entry tips</h2><ul class="fx" style="color:var(--ink);padding-left:18px;margin:0">
       <li>Airport IDs: all caps, 4-letter ICAO; if the ID has a number drop the K (02AZ, P08).</li><li>Visibility must be below 3 and have a reason (BR, RA, -RA …) for an IMC scenario.</li><li>Don't use altimeter settings that end in "0".</li><li>Ceiling altitude is in hundreds of feet (006 = 600 ft).</li><li>SID transition: pick from the NASR list or type it.</li><li>Select ATC / ASOS / ATIS source and clearance types from the drop-downs.</li></ul>
       <h3>WX codes</h3><table class="ref">${WXREF.map(r => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join('')}</table></section>
@@ -575,6 +576,20 @@
     const need = new Set(S.settings.states || []); missionStates(S.m).forEach(st => need.add(st));
     await D.loadStates(Array.from(need)); D.stFilter = S.settings.stFilter || 'ALL'; afterLoad();
   }
+  /* First visit: boot() fetched the chosen states BEFORE the service worker controlled the page, so those requests bypassed its cache (every state is "pre": false).
+     Once the worker controls the page, fetch the loaded states again through it - in every cycle of the manifest, as the worker's install does for carried-over states -
+     so an offline reload does not depend on the browser's HTTP cache (GitHub Pages sends max-age=600; a CI runner's fresh checkout has none). */
+  let warmed = Promise.resolve(0);                               // resolves when warmOffline() has finished (tests await it instead of guessing a delay)
+  async function warmOffline() {
+    try {
+      const sw = navigator.serviceWorker; await sw.ready;
+      if (!sw.controller) await new Promise(res => { sw.addEventListener('controllerchange', res, { once: true }); setTimeout(res, 8000); });
+      if (!sw.controller) return 0;
+      const urls = []; D.manifest.cycles.forEach(cy => Object.keys(D.loaded).forEach(st => { if (cy.states[st]) urls.push(cy.states[st].url); }));
+      await Promise.all(urls.map(u => fetch(u).then(r => r.arrayBuffer()).catch(() => { })));      // read each body to the end: an unread response keeps the request open
+      return urls.length;
+    } catch (e) { return 0; /* offline copies are filled on first use instead */ }
+  }
   async function setStates(list) {                             // download the newly ticked states (the service worker keeps them offline), drop the unticked ones
     const old = S.settings.states || [], add = list.filter(x => old.indexOf(x) < 0), rem = old.filter(x => list.indexOf(x) < 0), keep = missionStates(S.m);
     S.settings.states = list.slice(); jset(LS.settings, S.settings);
@@ -640,6 +655,7 @@
     const ms = missions(), names = Object.keys(ms).sort((a, b) => (ms[b].saved || '').localeCompare(ms[a].saved || ''));
     const m = $('#modal');
     m.innerHTML = `<div class="box"><h2 style="margin:0 0 8px">Missions <button class="btn sm" style="float:right" data-m="close">Close</button></h2>
+      <p class="fx" id="storeNoteM">${esc(STORAGE_NOTICE)}</p>
       <div class="grid g2"><div class="f full"><label>Save current mission as</label><input id="mName" value="${esc(S.m.name || '')}" placeholder="Mission name"></div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><button class="btn pri" data-m="save">Save</button><button class="btn" data-m="new">New mission</button><button class="btn" data-m="example">KTUS→KRYN→KDMA example</button></div>
       <h3 style="font-size:13px;color:var(--mut);text-transform:uppercase">Saved (${names.length})</h3>
@@ -767,10 +783,11 @@
     $('#view-plan').innerHTML = planHTML(); afterPlan(); wire();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => { });
+      warmed = warmOffline();
     }
     watchUpdates();
     if (!S.settings.welcomed) openWelcome();
-    window.__amr = { S, M, D, env, setStates, ensureStates, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
+    window.__amr = { S, M, D, env, get warmed() { return warmed; }, setStates, ensureStates, setTab, renderView, PDF, buildPdf, renderPdf };       // handy for tests
     document.body.dataset.ready = '1';
   }
   boot().catch(e => { document.body.insertAdjacentHTML('afterbegin', `<pre style="color:#b00;padding:12px">Failed to start: ${esc(e.message)}</pre>`); console.error(e); });
